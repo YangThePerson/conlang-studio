@@ -4,10 +4,16 @@ import { db } from '@/app/db';
 import { languages } from '@/app/db/schema';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 
+/** Route segment params for language-specific endpoints. */
 type Params = { params: Promise<{ id: string }> };
 
 const renameSchema = z.object({ name: z.string().min(1) });
 
+/**
+ * PATCH /api/languages/[id]
+ * Renames a language. Returns 404 if the language doesn't exist or belongs to another user.
+ * Body: `{ name: string }`
+ */
 export async function PATCH(req: Request, { params }: Params) {
   const user = await getOrCreateDbUser();
   if (!user) return new Response(null, { status: 401 });
@@ -32,6 +38,11 @@ export async function PATCH(req: Request, { params }: Params) {
   return Response.json(updated);
 }
 
+/**
+ * DELETE /api/languages/[id]
+ * Deletes a language and all its associated data (cascade). Returns 404 if not found or
+ * owned by another user. Returns 204 on success.
+ */
 export async function DELETE(_req: Request, { params }: Params) {
   const user = await getOrCreateDbUser();
   if (!user) return new Response(null, { status: 401 });

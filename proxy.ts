@@ -1,3 +1,8 @@
+/**
+ * Clerk authentication middleware.
+ * Home, sign-in, and sign-up are publicly accessible.
+ * All other routes — including every API route — require an active Clerk session.
+ */
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);

@@ -16,12 +16,14 @@ import { SyllableTemplate, RuleContext } from './json-shapes';
 // Tables
 // ---------------------------------------------------------------------------
 
+/** App users, one row per Clerk account. Created automatically on first sign-in. */
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   clerk_id: text('clerk_id').notNull().unique(),
   email: text('email').notNull().unique(),
 });
 
+/** A constructed language owned by a user. All phonology and lexicon data is scoped under this. */
 export const languages = pgTable('languages', {
   id: uuid('id').defaultRandom().primaryKey(),
   user_id: uuid('user_id')
@@ -30,6 +32,10 @@ export const languages = pgTable('languages', {
   name: text('name').notNull(),
 });
 
+/**
+ * Individual sound units (IPA symbols) belonging to a language.
+ * `weight` controls how frequently this phoneme is sampled during word generation.
+ */
 export const phonemes = pgTable(
   'phonemes',
   {
@@ -43,6 +49,10 @@ export const phonemes = pgTable(
   (t) => [unique().on(t.language_id, t.symbol)],
 );
 
+/**
+ * Named sets of phonemes (e.g. "vowels", "stops") used as shorthand slots
+ * in syllable templates and phonological rules.
+ */
 export const phoneme_groups = pgTable(
   'phoneme_groups',
   {
@@ -55,6 +65,7 @@ export const phoneme_groups = pgTable(
   (t) => [unique().on(t.language_id, t.name)],
 );
 
+/** Join table for the many-to-many relationship between phonemes and phoneme groups. */
 export const group_memberships = pgTable(
   'group_memberships',
   {
@@ -68,6 +79,10 @@ export const group_memberships = pgTable(
   (t) => [primaryKey({ columns: [t.group_id, t.phoneme_id] })],
 );
 
+/**
+ * Weighted templates defining valid syllable shapes for a language (e.g. CV, CVC, V).
+ * A language typically has several structures; `weight` biases how often each is chosen.
+ */
 export const syllable_structures = pgTable('syllable_structures', {
   id: uuid('id').defaultRandom().primaryKey(),
   language_id: uuid('language_id')
@@ -77,6 +92,12 @@ export const syllable_structures = pgTable('syllable_structures', {
   weight: doublePrecision('weight').notNull().default(1.0),
 });
 
+/**
+ * Phonological rewrite rules applied in `position` order during word generation.
+ * Each rule transforms a target phoneme (or any member of a target group) into
+ * `output_phoneme_id` when `left_context` and `right_context` both match.
+ * Exactly one of `target_phoneme_id` or `target_group_id` must be set (enforced by DB check).
+ */
 export const rules = pgTable(
   'rules',
   {
@@ -110,6 +131,7 @@ export const rules = pgTable(
   ],
 );
 
+/** A dictionary entry (word form) in a language. A lexeme can have multiple senses. */
 export const lexemes = pgTable('lexemes', {
   id: uuid('id').defaultRandom().primaryKey(),
   language_id: uuid('language_id')
@@ -119,6 +141,7 @@ export const lexemes = pgTable('lexemes', {
   notes: text('notes'),
 });
 
+/** One meaning of a lexeme, with its part of speech and definition. */
 export const senses = pgTable('senses', {
   id: uuid('id').defaultRandom().primaryKey(),
   lexeme_id: uuid('lexeme_id')
@@ -128,6 +151,7 @@ export const senses = pgTable('senses', {
   definition: text('definition').notNull(),
 });
 
+/** User-defined labels for categorizing lexemes within a language (e.g. "body parts", "verbs"). */
 export const tags = pgTable(
   'tags',
   {
@@ -140,6 +164,7 @@ export const tags = pgTable(
   (t) => [unique().on(t.language_id, t.name)],
 );
 
+/** Join table for the many-to-many relationship between lexemes and tags. */
 export const lexeme_tags = pgTable(
   'lexeme_tags',
   {

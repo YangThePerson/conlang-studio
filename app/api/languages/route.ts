@@ -5,6 +5,10 @@ import { createLanguageInputSchema } from '@/app/db/validation';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import z from 'zod';
 
+/**
+ * GET /api/languages
+ * Returns all languages owned by the authenticated user.
+ */
 export async function GET() {
   const user = await getOrCreateDbUser();
   if (!user) return new Response(null, { status: 401 });
@@ -17,6 +21,12 @@ export async function GET() {
   return Response.json(result);
 }
 
+/**
+ * POST /api/languages
+ * Creates a new language for the authenticated user.
+ * Body: `{ name: string }`
+ * Returns the created language row with status 201.
+ */
 export async function POST(req: Request) {
   const user = await getOrCreateDbUser();
   if (!user) return new Response(null, { status: 401 });

@@ -8,6 +8,9 @@ import { users } from '@/app/db/schema';
 /**
  * Resolves the Clerk session to a DB user row, creating one on first sign-in.
  * Returns null if the request is unauthenticated.
+ *
+ * Wrapped in React's `cache` so repeated calls within the same request share
+ * a single DB round-trip.
  */
 export const getOrCreateDbUser = cache(async () => {
   const { userId } = await auth();
