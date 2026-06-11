@@ -2,7 +2,13 @@ import { z } from 'zod';
 import { templateSchema, contextSchema } from './json-shapes';
 
 export const createUserSchema = z.object({
+  clerk_id: z.string().min(1),
   email: z.email(),
+});
+
+// For API routes: user_id is always injected server-side from auth, never from the client.
+export const createLanguageInputSchema = z.object({
+  name: z.string().min(1),
 });
 
 export const createLanguageSchema = z.object({
