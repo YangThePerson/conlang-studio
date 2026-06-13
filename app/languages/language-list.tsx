@@ -34,7 +34,7 @@ export default function LanguageList({ languages: langs }: { languages: Language
 
   return (
     <div>
-      <form action={createLanguage} className="flex gap-2 mb-6">
+      <form action={async (fd) => { await createLanguage(fd); }} className="flex gap-2 mb-6">
         <input
           name="name"
           placeholder="New language name"
@@ -73,7 +73,7 @@ export default function LanguageList({ languages: langs }: { languages: Language
                   {lang.name}
                 </button>
               )}
-              <form action={deleteLanguage.bind(null, lang.id)}>
+              <form action={async (fd) => { await deleteLanguage(lang.id, fd); }}>
                 <button type="submit" className="text-red-500 hover:text-red-700 text-sm px-2 py-1">
                   Delete
                 </button>
