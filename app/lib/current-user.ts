@@ -11,6 +11,11 @@ import { users } from '@/app/db/schema';
  *
  * Wrapped in React's `cache` so repeated calls within the same request share
  * a single DB round-trip.
+ *
+ * NOTE: This function **writes** — it inserts a user row on first call for a
+ * given Clerk account. An otherwise read-only route that calls it (e.g. a GET
+ * handler or a Server Component) can therefore trigger a DB insert. That is the
+ * intended lazy-provisioning model; callers should be aware of this side effect.
  */
 export const getOrCreateDbUser = cache(async () => {
   const { userId } = await auth();
