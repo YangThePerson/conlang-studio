@@ -15,6 +15,11 @@ export const createLanguageInputSchema = z.object({
   name: z.string().min(1),
 });
 
+/** Validates the client-supplied body for PATCH /api/languages/[id]. */
+export const renameLanguageInputSchema = z.object({
+  name: z.string().min(1),
+});
+
 /** Full payload for inserting a language row, including the server-injected `user_id`. */
 export const createLanguageSchema = z.object({
   user_id: z.uuid(),

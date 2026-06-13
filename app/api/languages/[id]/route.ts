@@ -2,12 +2,11 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/app/db';
 import { languages } from '@/app/db/schema';
+import { renameLanguageInputSchema } from '@/app/db/validation';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 
 /** Route segment params for language-specific endpoints. */
 type Params = { params: Promise<{ id: string }> };
-
-const renameSchema = z.object({ name: z.string().min(1) });
 
 /**
  * PATCH /api/languages/[id]
@@ -20,7 +19,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const { id } = await params;
   const body = await req.json();
-  const parsed = renameSchema.safeParse(body);
+  const parsed = renameLanguageInputSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
       { error: z.treeifyError(parsed.error) },
