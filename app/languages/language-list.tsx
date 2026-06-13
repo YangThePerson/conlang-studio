@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { createLanguage, renameLanguage, deleteLanguage } from './actions';
+import { createLanguage, updateLanguage, deleteLanguage } from './actions';
 import type { languages } from '@/app/db/schema';
 
 type Language = typeof languages.$inferSelect;
@@ -27,7 +27,7 @@ export default function LanguageList({ languages: langs }: { languages: Language
   function commitRename(id: string) {
     if (!editName.trim()) { setEditingId(null); return; }
     startTransition(async () => {
-      await renameLanguage(id, editName);
+      await updateLanguage(id, editName);
       setEditingId(null);
     });
   }
