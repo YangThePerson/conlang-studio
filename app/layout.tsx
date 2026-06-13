@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import Link from 'next/link';
 import './globals.css';
 import {
   ClerkProvider,
@@ -45,6 +46,9 @@ export default function RootLayout({
               </SignUpButton>
             </Show>
             <Show when="signed-in">
+              <Link href="/languages" className="text-sm font-medium hover:text-purple-700">
+                Languages
+              </Link>
               <UserButton />
             </Show>
           </header>
