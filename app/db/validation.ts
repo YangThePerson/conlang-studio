@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { templateSchema, contextSchema } from './json-shapes';
 
+/** Validates any UUID string — used to sanitize id params in actions and route handlers. */
+export const uuidSchema = z.uuid();
+
 /** Validates the payload for creating a new app user (called internally on first sign-in). */
 export const createUserSchema = z.object({
   clerk_id: z.string().min(1),
