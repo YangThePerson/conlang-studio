@@ -18,8 +18,11 @@ export const createLanguageInputSchema = z.object({
   name: z.string().min(1),
 });
 
-/** Validates the client-supplied body for PATCH /api/languages/[id]. */
-export const renameLanguageInputSchema = z.object({
+/**
+ * Validates the client-supplied body for PATCH /api/languages/[id].
+ * `id` is intentionally absent — it comes from the route segment, not the request body.
+ */
+export const updateLanguageInputSchema = z.object({
   name: z.string().min(1),
 });
 
