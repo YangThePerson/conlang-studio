@@ -95,7 +95,9 @@ export default function LanguageList({ languages: langs }: { languages: Language
           </button>
         </div>
         {createState && !createState.ok && (
-          <p className="text-red-500 text-sm">{createState.error}</p>
+          <p className="text-red-500 text-sm">
+            {createState.kind === 'validation' ? 'Invalid input — please check the form.' : 'Something went wrong. Please try again.'}
+          </p>
         )}
       </form>
 

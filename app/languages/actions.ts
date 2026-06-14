@@ -22,7 +22,7 @@ export async function createLanguage(
   formData: FormData,
 ): Promise<Result<Language>> {
   const user = await getOrCreateDbUser();
-  if (!user) return { ok: false, error: 'Unauthorized' };
+  if (!user) return { ok: false, kind: 'unauthorized' };
 
   const result = await createLanguageSvc(user, { name: formData.get('name') });
   if (result.ok) revalidatePath('/languages');
@@ -35,7 +35,7 @@ export async function createLanguage(
  */
 export async function updateLanguage(id: string, name: string) {
   const user = await getOrCreateDbUser();
-  if (!user) return { ok: false as const, error: 'Unauthorized' };
+  if (!user) return { ok: false, kind: 'unauthorized' };
 
   const result = await updateLanguageSvc(user, id, { name });
   if (result.ok) revalidatePath('/languages');
@@ -54,7 +54,7 @@ export async function deleteLanguage(
   _formData: FormData,
 ): Promise<Result<Language>> {
   const user = await getOrCreateDbUser();
-  if (!user) return { ok: false, error: 'Unauthorized' };
+  if (!user) return { ok: false, kind: 'unauthorized' };
 
   const result = await deleteLanguageSvc(user, id);
   if (result.ok) revalidatePath('/languages');

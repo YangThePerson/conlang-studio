@@ -27,7 +27,8 @@ export async function POST(req: Request) {
   const result = await createLanguage(user, body);
 
   if (!result.ok) {
-    return Response.json({ error: result.error, issues: result.issues }, { status: 400 });
+    const issues = result.kind === 'validation' ? result.issues : undefined;
+    return Response.json({ error: result.kind, issues }, { status: 400 });
   }
 
   return Response.json(result.data, { status: 201 });

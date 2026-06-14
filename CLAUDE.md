@@ -50,7 +50,7 @@ Triggered by any HTTP client (future mobile app, external scripts, curl). A rout
 - Resolves auth (today: cookie session via `getOrCreateDbUser()`; **see mobile note below**).
 - Parses the request body / reads route params into a plain object.
 - Calls the same `app/lib/<feature>.ts` function the corresponding action uses.
-- Maps the result to HTTP: `{ ok: true }` → `200`/`201` with the row in `Response.json(...)`; `{ ok: false }` → the appropriate status (`400`/`401`/`403`/`404`) with a JSON error body.
+- Maps the result to HTTP: `{ ok: true }` → `200`/`201` with the row in `Response.json(...)`; `{ ok: false }` → the appropriate status (`400`/`401`/`404`) with a JSON error body.
 
 > **Mobile-auth caveat:** A mobile client cannot ride Clerk's cookie session — it authenticates with bearer tokens via Clerk's mobile SDK. So `getOrCreateDbUser()` as written (cookie-session resolution) will **not** transfer unchanged to the route handlers a mobile app calls; that path will need a token-based resolver. The _service layer_ is unaffected because it receives an already-resolved user. Until a mobile client is real, the parallel route handlers are kept deliberately, but because the service layer makes adding them trivial, deleting them and re-adding later is a legitimate alternative — decide consciously rather than by default.
 
@@ -86,7 +86,10 @@ Service functions return a discriminated union:
 ```ts
 type Result<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string; issues?: unknown }; // issues = z.treeifyError output on validation failure
+  | { ok: false; kind: 'validation'; issues: unknown } // issues = z.treeifyError output
+  | { ok: false; kind: 'not_found' }
+  | { ok: false; kind: 'unauthorized' }
+  | { ok: false; kind: 'invalid_id' };
 ```
 
 Rationale: validation failures, auth failures, and "not found / not owned" are **expected** outcomes, not exceptional ones — the same reasoning behind using `safeParse` over `parse`. Returning them as values lets actions feed them straight into `useActionState` and lets route handlers map them to status codes, with one consistent contract across both entry points. In production, Next.js also redacts thrown error messages sent to the client, so `throw new Error('Invalid input')` would not reliably surface useful detail anyway.

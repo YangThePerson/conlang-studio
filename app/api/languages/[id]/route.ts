@@ -18,8 +18,9 @@ export async function PATCH(req: Request, { params }: Params) {
   const result = await updateLanguage(user, id, body);
 
   if (!result.ok) {
-    const status = result.error === 'Not found' ? 404 : 400;
-    return Response.json({ error: result.error, issues: result.issues }, { status });
+    const status = result.kind === 'not_found' ? 404 : 400;
+    const issues = result.kind === 'validation' ? result.issues : undefined;
+    return Response.json({ error: result.kind, issues }, { status });
   }
 
   return Response.json(result.data);
@@ -38,8 +39,8 @@ export async function DELETE(_req: Request, { params }: Params) {
   const result = await deleteLanguage(user, id);
 
   if (!result.ok) {
-    const status = result.error === 'Not found' ? 404 : 400;
-    return Response.json({ error: result.error }, { status });
+    const status = result.kind === 'not_found' ? 404 : 400;
+    return Response.json({ error: result.kind }, { status });
   }
 
   return new Response(null, { status: 204 });
