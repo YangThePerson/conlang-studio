@@ -1,49 +1,102 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 import { createLanguage, updateLanguage, deleteLanguage } from './actions';
 import type { languages } from '@/app/db/schema';
 
 type Language = typeof languages.$inferSelect;
 
 /**
- * Renders the full language management UI: a create form at the top, then a list
- * where each row supports inline rename (click name → edit in place) and delete.
- * All mutations go through Server Actions; `revalidatePath` in each action refreshes
- * the server-rendered list automatically.
+ * Single language row: supports inline rename (click name → edit in place) and delete.
+ * Extracted so each row can hold its own `useActionState` instance for the delete form.
  */
-export default function LanguageList({ languages: langs }: { languages: Language[] }) {
-  const [editingId, setEditingId] = useState<string | null>(null);
+function LanguageItem({ lang }: { lang: Language }) {
+  const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [, startTransition] = useTransition();
+  const [, deleteAction, deletePending] = useActionState(
+    deleteLanguage.bind(null, lang.id),
+    null,
+  );
 
-  /** Enters edit mode for a row, seeding the input with the current name. */
-  function startEdit(id: string, name: string) {
-    setEditingId(id);
-    setEditName(name);
+  function startEdit() {
+    setIsEditing(true);
+    setEditName(lang.name);
   }
 
-  /** Submits the rename if the input is non-empty, otherwise cancels the edit. */
-  function commitRename(id: string) {
-    if (!editName.trim()) { setEditingId(null); return; }
+  function commitRename() {
+    if (!editName.trim()) { setIsEditing(false); return; }
     startTransition(async () => {
-      await updateLanguage(id, editName);
-      setEditingId(null);
+      await updateLanguage(lang.id, editName);
+      setIsEditing(false);
     });
   }
 
   return (
-    <div>
-      <form action={async (fd) => { await createLanguage(fd); }} className="flex gap-2 mb-6">
+    <li className="flex items-center gap-2 p-3 border rounded">
+      {isEditing ? (
         <input
-          name="name"
-          placeholder="New language name"
-          required
-          className="flex-1 border rounded px-3 py-2"
+          autoFocus
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitRename();
+            if (e.key === 'Escape') setIsEditing(false);
+          }}
+          onBlur={commitRename}
+          className="flex-1 border rounded px-2 py-1"
         />
-        <button type="submit" className="bg-purple-700 text-white px-4 py-2 rounded">
-          Create
+      ) : (
+        <button
+          type="button"
+          className="flex-1 text-left hover:text-purple-700"
+          onClick={startEdit}
+        >
+          {lang.name}
         </button>
+      )}
+      <form action={deleteAction}>
+        <button
+          type="submit"
+          disabled={deletePending}
+          className="text-red-500 hover:text-red-700 text-sm px-2 py-1 disabled:opacity-50"
+        >
+          Delete
+        </button>
+      </form>
+    </li>
+  );
+}
+
+/**
+ * Renders the full language management UI: a create form at the top, then a list
+ * where each row supports inline rename and delete. All mutations go through Server
+ * Actions; `revalidatePath` in each action refreshes the server-rendered list.
+ */
+export default function LanguageList({ languages: langs }: { languages: Language[] }) {
+  const [createState, createAction, createPending] = useActionState(createLanguage, null);
+
+  return (
+    <div>
+      <form action={createAction} className="flex flex-col gap-2 mb-6">
+        <div className="flex gap-2">
+          <input
+            name="name"
+            placeholder="New language name"
+            required
+            className="flex-1 border rounded px-3 py-2"
+          />
+          <button
+            type="submit"
+            disabled={createPending}
+            className="bg-purple-700 text-white px-4 py-2 rounded disabled:opacity-50"
+          >
+            Create
+          </button>
+        </div>
+        {createState && !createState.ok && (
+          <p className="text-red-500 text-sm">{createState.error}</p>
+        )}
       </form>
 
       {langs.length === 0 ? (
@@ -51,34 +104,7 @@ export default function LanguageList({ languages: langs }: { languages: Language
       ) : (
         <ul className="space-y-2">
           {langs.map((lang) => (
-            <li key={lang.id} className="flex items-center gap-2 p-3 border rounded">
-              {editingId === lang.id ? (
-                <input
-                  autoFocus
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitRename(lang.id);
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                  onBlur={() => commitRename(lang.id)}
-                  className="flex-1 border rounded px-2 py-1"
-                />
-              ) : (
-                <button
-                  type="button"
-                  className="flex-1 text-left hover:text-purple-700"
-                  onClick={() => startEdit(lang.id, lang.name)}
-                >
-                  {lang.name}
-                </button>
-              )}
-              <form action={async (fd) => { await deleteLanguage(lang.id, fd); }}>
-                <button type="submit" className="text-red-500 hover:text-red-700 text-sm px-2 py-1">
-                  Delete
-                </button>
-              </form>
-            </li>
+            <LanguageItem key={lang.id} lang={lang} />
           ))}
         </ul>
       )}

@@ -6,7 +6,7 @@ import { createLanguageInputSchema, updateLanguageInputSchema, uuidSchema } from
 
 type Language = typeof languages.$inferSelect;
 type DbUser = typeof users.$inferSelect;
-type Result<T> = { ok: true; data: T } | { ok: false; error: string; issues?: unknown };
+export type Result<T> = { ok: true; data: T } | { ok: false; error: string; issues?: unknown };
 
 /**
  * Returns all languages owned by the given user.
