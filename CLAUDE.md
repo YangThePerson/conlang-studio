@@ -127,6 +127,67 @@ If a route handler and a Server Action do the same thing, they import the same s
 
 ---
 
+## Frontend: server-first, service layer is the only data source
+
+The same rule that governs the backend governs the UI: **components are adapters too, not a second home for logic.** A Server Component that reads data and a Server Action that mutates it are both thin entry points over `app/lib/<feature>.ts` — they resolve auth, call the service, and render or return the result. Client Components never touch the database, auth, or the service layer directly; they receive data as props and trigger mutations through actions.
+
+### Default to Server Components; push `'use client'` to the leaves
+
+- Every component is a Server Component unless it needs interactivity (state, effects, event handlers, browser APIs). Then, and only then, add `'use client'`.
+- Add the directive as far down the tree as possible. A mostly-static page with one interactive widget keeps the page server-rendered and marks only the widget. Marking a whole page `'use client'` to fix one button is the frontend equivalent of putting logic in the adapter — it works, and it quietly costs you.
+- A Client Component must never import from `app/lib/*`, `app/db/*`, or call `auth()` / `getOrCreateDbUser()`. If a client file needs server data, it gets it from a Server Component parent (props) or from a Server Action (return value). This is what keeps secrets and DB access on the server.
+
+### Reading data: a Server Component is the third adapter
+
+Reads have the same shape as the other two entry points. A Server Component that needs owned data resolves the user via `getOrCreateDbUser()` and calls a service read function (`listLanguages(user)`, `getLanguage(user, id)`) — it does **not** query the DB inline. The `Result` contract applies here too: on `{ ok: false }` render the empty/error state; on `{ ok: true }` render `data`.
+
+> Note: this is why data fetching happens on the server by default — the service layer, auth resolution, and the DB connection all live server-side, and a Server Component runs there. Fetching the same data in a Client Component would mean exposing one of those, which the architecture forbids.
+
+### Mutations from the client: `useActionState` → Server Action → service
+
+The form flow is fixed:
+
+1. A Client Component form calls a Server Action via `useActionState`.
+2. The action resolves auth, calls the service, `revalidatePath(...)`, and returns the `Result` (see _Route handlers vs. Server Actions_).
+3. The component renders from that `Result`: show `error` as a message, and use `issues` (the `z.treeifyError` output) to place field-level errors next to the right inputs.
+
+Never throw from an action to signal a validation or ownership failure — the client reads the result as a value, exactly as the result shape intends.
+
+### Validation lives once — reuse the schema on the client
+
+Client-side validation is **UX, not enforcement**: it gives fast feedback before a round-trip. The server stays the source of truth (the service `safeParse`s regardless). So do not write a second, hand-rolled set of client checks — import the same `create<Entity>InputSchema` / `update<Entity>InputSchema` from `app/db/validation.ts` and validate against it in the form. One schema, two consumers. This is how "validation on both sides" is satisfied without two definitions that can drift apart.
+
+### Loading and error UI
+
+- `loading.tsx` (or a `<Suspense>` boundary) for every route that fetches on the server, so a slow query shows a skeleton, not a blank screen.
+- `error.tsx` is a Client Component (`'use client'`) and **is the framework error boundary referenced in the Result shape** — it is where genuinely-unexpected throws land. Expected failures never reach it; they come back as `{ ok: false }`.
+- `not-found.tsx` for the not-found path, consistent with returning 404 when a row is absent or not owned.
+
+### Styling: Tailwind (locked — same spirit as the stack)
+
+Tailwind ships with `create-next-app` by default; switching to anything else now is the switching-cost tax. So it is locked, like the stack.
+
+> The one rule that matters here is the same rule as everywhere else in this project: **learn each utility class you use; do not paste an opaque class string you can't read back.** A wall of `flex items-center gap-2 rounded-md …` copied without understanding is the styling version of committing a line you can't explain. Look the unfamiliar ones up as you go — the vocabulary is small and finite.
+
+### Accessibility baseline (not gold-plating)
+
+This is the difference between "works on my machine" and "a stranger trusts it" — the Phase 2 bar:
+
+- Every input has an associated `<label>`; every button is a real `<button>`.
+- The whole app is operable by keyboard, and focus is always visible.
+- Use semantic elements (`<nav>`, `<main>`, ordered headings) over `<div>` soup.
+- Images carry meaningful `alt` text.
+
+### Not yet, but on the radar (frontend)
+
+Intentionally out of scope now — listed so they aren't forgotten:
+
+- Optimistic UI (`useOptimistic`) for mutations where the round-trip feels slow.
+- A small set of shared UI primitives (button, input, card) — only once duplication starts to hurt.
+- Design tokens / theming — only if the app grows enough surfaces to need consistency enforced.
+
+---
+
 ## Documentation
 
 - All exported functions (route handlers, Server Actions, service functions, helpers, schemas) must have a JSDoc comment.
