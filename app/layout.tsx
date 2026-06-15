@@ -33,10 +33,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
         <ClerkProvider>
-          <header className="flex justify-end items-center p-4 gap-4 h-16">
+          <header className="flex justify-end items-center p-4 gap-4 h-16 bg-gray-900">
             <Show when="signed-out">
               <SignInButton />
               <SignUpButton>
@@ -46,7 +46,10 @@ export default function RootLayout({
               </SignUpButton>
             </Show>
             <Show when="signed-in">
-              <Link href="/languages" className="text-sm font-medium hover:text-purple-700">
+              <Link
+                href="/languages"
+                className="text-sm font-medium hover:text-purple-700"
+              >
                 Languages
               </Link>
               <UserButton />
