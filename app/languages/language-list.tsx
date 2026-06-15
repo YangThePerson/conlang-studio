@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { createLanguage, updateLanguage, deleteLanguage } from './actions';
 import type { languages } from '@/app/db/schema';
 
@@ -25,7 +26,6 @@ function LanguageItem({ lang }: { lang: Language }) {
   }
 
   function commitRename() {
-    if (!editName.trim()) { setIsEditing(false); return; }
     startTransition(async () => {
       await updateLanguage(lang.id, editName);
       setIsEditing(false);
@@ -47,19 +47,23 @@ function LanguageItem({ lang }: { lang: Language }) {
           className="flex-1 border rounded px-2 py-1"
         />
       ) : (
-        <button
-          type="button"
-          className="flex-1 text-left hover:text-purple-700"
-          onClick={startEdit}
-        >
+        <Link href={`/languages/${lang.id}`} className="flex-1 text-left hover:underline">
           {lang.name}
-        </button>
+        </Link>
       )}
       <form action={deleteAction}>
         <button
+          type="button"
+          disabled={isEditing}
+          onClick={startEdit}
+          className="text-slate-500 enabled:hover:text-slate-700 text-sm px-2 py-1 disabled:opacity-50 cursor-pointer"
+        >
+          Rename
+        </button>
+        <button
           type="submit"
           disabled={deletePending}
-          className="text-red-500 hover:text-red-700 text-sm px-2 py-1 disabled:opacity-50"
+          className="text-red-500 hover:text-red-700 text-sm px-2 py-1 disabled:opacity-50 cursor-pointer"
         >
           Delete
         </button>
@@ -73,8 +77,15 @@ function LanguageItem({ lang }: { lang: Language }) {
  * where each row supports inline rename and delete. All mutations go through Server
  * Actions; `revalidatePath` in each action refreshes the server-rendered list.
  */
-export default function LanguageList({ languages: langs }: { languages: Language[] }) {
-  const [createState, createAction, createPending] = useActionState(createLanguage, null);
+export default function LanguageList({
+  languages: langs,
+}: {
+  languages: Language[];
+}) {
+  const [createState, createAction, createPending] = useActionState(
+    createLanguage,
+    null,
+  );
 
   return (
     <div>
@@ -89,14 +100,16 @@ export default function LanguageList({ languages: langs }: { languages: Language
           <button
             type="submit"
             disabled={createPending}
-            className="bg-purple-700 text-white px-4 py-2 rounded disabled:opacity-50"
+            className="bg-teal-700 text-white px-4 py-2 rounded disabled:opacity-50 cursor-pointer"
           >
             Create
           </button>
         </div>
         {createState && !createState.ok && (
           <p className="text-red-500 text-sm">
-            {createState.kind === 'validation' ? 'Invalid input — please check the form.' : 'Something went wrong. Please try again.'}
+            {createState.kind === 'validation'
+              ? 'Invalid input — please check the form.'
+              : 'Something went wrong. Please try again.'}
           </p>
         )}
       </form>
