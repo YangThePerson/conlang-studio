@@ -44,7 +44,8 @@ export const phonemes = pgTable(
       .notNull()
       .references(() => languages.id, { onDelete: 'cascade' }),
     symbol: text('symbol').notNull(),
-    weight: doublePrecision('weight').notNull().default(1.0),
+    ipa: text('ipa').default(''),
+    weight: doublePrecision('weight').notNull().default(1),
   },
   (t) => [unique().on(t.language_id, t.symbol)],
 );
