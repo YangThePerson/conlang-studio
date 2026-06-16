@@ -32,7 +32,31 @@ export const createLanguageSchema = z.object({
   name: z.string().min(1),
 });
 
-/** Validates a new phoneme. `weight` controls sampling frequency; defaults to 1.0. */
+/**
+ * Validates the client-supplied fields for creating a phoneme.
+ * `language_id` is intentionally absent — it comes from the route segment, not the request body.
+ */
+export const createPhonemeInputSchema = z.object({
+  symbol: z.string().min(1),
+  ipa: z.string().optional(),
+  weight: z.number().positive().optional(),
+});
+
+/**
+ * Validates the client-supplied fields for updating a phoneme.
+ * Both fields are optional, but at least one must be provided.
+ */
+export const updatePhonemeInputSchema = z
+  .object({
+    symbol: z.string().min(1).optional(),
+    weight: z.number().min(0).max(2).positive().optional(),
+    ipa: z.string().optional(),
+  })
+  .refine((v) => v.symbol !== undefined || v.weight !== undefined, {
+    message: 'At least one of symbol or weight must be provided',
+  });
+
+/** Full insert payload for a phoneme row, including the server-injected `language_id`. */
 export const createPhonemeSchema = z.object({
   language_id: z.uuid(),
   symbol: z.string().min(1),
@@ -76,7 +100,10 @@ export const createRuleSchema = z
   .refine(
     (v) =>
       (v.target_phoneme_id !== undefined) !== (v.target_group_id !== undefined),
-    { message: 'Exactly one of target_phoneme_id or target_group_id must be set' },
+    {
+      message:
+        'Exactly one of target_phoneme_id or target_group_id must be set',
+    },
   );
 
 /** Validates a new lexeme (dictionary entry). `notes` is optional free-form text. */
