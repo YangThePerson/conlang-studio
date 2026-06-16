@@ -6,9 +6,9 @@ import {
   createLanguage as createLanguageSvc,
   updateLanguage as updateLanguageSvc,
   deleteLanguage as deleteLanguageSvc,
-  type Result,
 } from '@/app/lib/languages';
 import type { languages } from '@/app/db/schema';
+import { Result } from '../lib/result';
 
 type Language = typeof languages.$inferSelect;
 
