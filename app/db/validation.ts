@@ -39,7 +39,7 @@ export const createLanguageSchema = z.object({
 export const createPhonemeInputSchema = z.object({
   symbol: z.string().min(1),
   ipa: z.string().optional(),
-  weight: z.number().positive().optional(),
+  weight: z.number().min(0).optional(),
 });
 
 /**
@@ -49,7 +49,7 @@ export const createPhonemeInputSchema = z.object({
 export const updatePhonemeInputSchema = z
   .object({
     symbol: z.string().min(1).optional(),
-    weight: z.number().min(0).max(2).positive().optional(),
+    weight: z.number().min(0).max(2).optional(),
     ipa: z.string().optional(),
   })
   .refine((v) => v.symbol !== undefined || v.weight !== undefined, {
