@@ -7,16 +7,10 @@ import {
   updateLanguageInputSchema,
   uuidSchema,
 } from '@/app/db/validation';
+import { Result } from './result';
 
 type Language = typeof languages.$inferSelect;
 type DbUser = typeof users.$inferSelect;
-
-export type Result<T> =
-  | { ok: true; data: T }
-  | { ok: false; kind: 'validation'; issues: unknown }
-  | { ok: false; kind: 'not_found' }
-  | { ok: false; kind: 'unauthorized' }
-  | { ok: false; kind: 'invalid_id' };
 
 /**
  * Returns all languages owned by the given user.
@@ -35,7 +29,11 @@ export async function createLanguage(
 ): Promise<Result<Language>> {
   const parsed = createLanguageInputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { ok: false, kind: 'validation', issues: z.treeifyError(parsed.error) };
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: z.treeifyError(parsed.error),
+    };
   }
 
   const [created] = await db
@@ -61,7 +59,11 @@ export async function updateLanguage(
 
   const parsed = updateLanguageInputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { ok: false, kind: 'validation', issues: z.treeifyError(parsed.error) };
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: z.treeifyError(parsed.error),
+    };
   }
 
   const [updated] = await db
