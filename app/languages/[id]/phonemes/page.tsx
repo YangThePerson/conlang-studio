@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import { listPhonemes } from '@/app/lib/phonemes';
+import PhonemeList from './phoneme-list';
 
 /** Phonemes editor: lists all phonemes for the language and allows adding, editing, and deleting. */
 export default async function PhonemesPage({
@@ -17,6 +18,7 @@ export default async function PhonemesPage({
   return (
     <div>
       <h1 className="text-2xl font-semibold mb-6">Phonemes</h1>
+      <PhonemeList phonemes={result.data} languageId={id} />
     </div>
   );
 }
