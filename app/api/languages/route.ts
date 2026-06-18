@@ -1,5 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
-import { listLanguages, createLanguage } from '@/app/lib/languages';
+import { listLanguagesSvc, createLanguageSvc } from '@/app/lib/languages';
 
 /**
  * GET /api/languages
@@ -9,7 +9,7 @@ export async function GET() {
   const user = await getOrCreateDbUser();
   if (!user) return new Response(null, { status: 401 });
 
-  const langs = await listLanguages(user);
+  const langs = await listLanguagesSvc(user);
   return Response.json(langs);
 }
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (!user) return new Response(null, { status: 401 });
 
   const body = await req.json();
-  const result = await createLanguage(user, body);
+  const result = await createLanguageSvc(user, body);
 
   if (!result.ok) {
     const issues = result.kind === 'validation' ? result.issues : undefined;

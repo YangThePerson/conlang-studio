@@ -3,9 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import {
-  createLanguage as createLanguageSvc,
-  updateLanguage as updateLanguageSvc,
-  deleteLanguage as deleteLanguageSvc,
+  createLanguageSvc,
+  updateLanguageSvc,
+  deleteLanguageSvc,
 } from '@/app/lib/languages';
 import type { languages } from '@/app/db/schema';
 import { Result } from '../lib/result';

@@ -15,7 +15,7 @@ type DbUser = typeof users.$inferSelect;
 /**
  * Returns all languages owned by the given user.
  */
-export async function listLanguages(user: DbUser): Promise<Language[]> {
+export async function listLanguagesSvc(user: DbUser): Promise<Language[]> {
   return db.select().from(languages).where(eq(languages.user_id, user.id));
 }
 
@@ -23,7 +23,7 @@ export async function listLanguages(user: DbUser): Promise<Language[]> {
  * Creates a new language for the given user from raw client input.
  * `user_id` is injected from `user` — it must not appear in `rawInput`.
  */
-export async function createLanguage(
+export async function createLanguageSvc(
   user: DbUser,
   rawInput: unknown,
 ): Promise<Result<Language>> {
@@ -49,7 +49,7 @@ export async function createLanguage(
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  * `rawId` is the bare UUID from the route segment or action argument — validated here before any DB access.
  */
-export async function updateLanguage(
+export async function updateLanguageSvc(
   user: DbUser,
   rawId: unknown,
   rawInput: unknown,
@@ -81,7 +81,7 @@ export async function updateLanguage(
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  * `rawId` is the bare UUID from the route segment or action argument — validated here before any DB access.
  */
-export async function deleteLanguage(
+export async function deleteLanguageSvc(
   user: DbUser,
   rawId: unknown,
 ): Promise<Result<Language>> {

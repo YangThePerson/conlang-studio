@@ -1,5 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
-import { listLanguages } from '@/app/lib/languages';
+import { listLanguagesSvc } from '@/app/lib/languages';
 import LanguageList from './language-list';
 
 /**
@@ -11,7 +11,7 @@ export default async function LanguagesPage() {
   const user = await getOrCreateDbUser();
   if (!user) return null;
 
-  const langs = await listLanguages(user);
+  const langs = await listLanguagesSvc(user);
 
   return (
     <main className="max-w-2xl mx-auto p-6">

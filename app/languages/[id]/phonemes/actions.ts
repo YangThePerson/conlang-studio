@@ -3,9 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import {
-  createPhoneme as createPhonemeSvc,
-  updatePhoneme as updatePhonemeSvc,
-  deletePhoneme as deletePhonemeSvc,
+  createPhonemeSvc,
+  updatePhonemeSvc,
+  deletePhonemeSvc,
 } from '@/app/lib/phonemes';
 import type { Result } from '@/app/lib/result';
 import type { phonemes } from '@/app/db/schema';

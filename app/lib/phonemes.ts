@@ -16,7 +16,7 @@ type DbUser = typeof users.$inferSelect;
  * Returns all phonemes for a language, verifying that the language is owned by `user`.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  */
-export async function listPhonemes(
+export async function listPhonemesSvc(
   user: DbUser,
   rawLanguageId: unknown,
 ): Promise<Result<Phoneme[]>> {
@@ -41,7 +41,7 @@ export async function listPhonemes(
  * `language_id` comes from the route, not client input — ownership is verified before insert.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  */
-export async function createPhoneme(
+export async function createPhonemeSvc(
   user: DbUser,
   rawLanguageId: unknown,
   rawInput: unknown,
@@ -81,7 +81,7 @@ export async function createPhoneme(
  * Ownership is verified by requiring the phoneme's `language_id` to belong to `user`
  * via a subquery on the languages table — there is no direct `user_id` on phonemes.
  */
-export async function updatePhoneme(
+export async function updatePhonemeSvc(
   user: DbUser,
   rawId: unknown,
   rawInput: unknown,
@@ -122,7 +122,7 @@ export async function updatePhoneme(
  * Deletes a phoneme, verifying ownership through the language table.
  * Returns `{ ok: false, kind: 'not_found' }` if the phoneme doesn't exist or belongs to another user's language.
  */
-export async function deletePhoneme(
+export async function deletePhonemeSvc(
   user: DbUser,
   rawId: unknown,
 ): Promise<Result<Phoneme>> {
