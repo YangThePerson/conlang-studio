@@ -200,6 +200,143 @@ export async function updatePhonemeGroupSvc(
   }
 }
 
+/**
+ * Adds a phoneme to a phoneme group.
+ * `rawLanguageId` is required to verify that both the phoneme and the group belong to the
+ * same user-owned language — neither table carries a direct `user_id`.
+ * Returns `{ ok: false, kind: 'not_found' }` if the language, phoneme, or group doesn't exist or belongs to another user.
+ * Returns `{ ok: false, kind: 'validation' }` if the phoneme is already a member of the group.
+ */
+export async function addPhonemeToGroupSvc(
+  user: DbUser,
+  rawLanguageId: unknown,
+  rawPhonemeId: unknown,
+  rawGroupId: unknown,
+): Promise<Result<PhonemeGroupMembership>> {
+  const parsedId = uuidSchema.safeParse(rawLanguageId);
+  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+
+  const parsed = createGroupMembershipSchema.safeParse({
+    group_id: rawGroupId,
+    phoneme_id: rawPhonemeId,
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: z.treeifyError(parsed.error),
+    };
+  }
+
+  const lang = await db.query.languages.findFirst({
+    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
+  });
+  if (!lang) return { ok: false, kind: 'not_found' };
+
+  const [phoneme, group] = await Promise.all([
+    db.query.phonemes.findFirst({
+      where: and(
+        eq(phonemes.id, parsed.data.phoneme_id),
+        eq(phonemes.language_id, parsedId.data),
+      ),
+    }),
+    db.query.phoneme_groups.findFirst({
+      where: and(
+        eq(phoneme_groups.id, parsed.data.group_id),
+        eq(phoneme_groups.language_id, parsedId.data),
+      ),
+    }),
+  ]);
+  if (!phoneme || !group) return { ok: false, kind: 'not_found' };
+
+  try {
+    const [created] = await db
+      .insert(group_memberships)
+      .values(parsed.data)
+      .returning();
+
+    return { ok: true, data: created };
+  } catch (error: unknown) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      // Postgres unique constraint violation code
+      error.code === '23505'
+    ) {
+      return {
+        ok: false,
+        kind: 'validation',
+        issues: { errors: ['This phoneme already belongs to this group.'] },
+      };
+    }
+
+    // Re-throw if it's an unexpected database error
+    throw error;
+  }
+}
+
+/**
+ * Removes a phoneme from a phoneme group.
+ * `rawLanguageId` is required to verify that both the phoneme and the group belong to the
+ * same user-owned language — neither table carries a direct `user_id`.
+ * Returns `{ ok: false, kind: 'not_found' }` if the language, phoneme, group, or the membership itself doesn't exist.
+ */
+export async function removePhonemeFromGroupSvc(
+  user: DbUser,
+  rawLanguageId: unknown,
+  rawPhonemeId: unknown,
+  rawGroupId: unknown,
+): Promise<Result<PhonemeGroupMembership>> {
+  const parsedId = uuidSchema.safeParse(rawLanguageId);
+  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+
+  const parsed = createGroupMembershipSchema.safeParse({
+    group_id: rawGroupId,
+    phoneme_id: rawPhonemeId,
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: z.treeifyError(parsed.error),
+    };
+  }
+
+  const lang = await db.query.languages.findFirst({
+    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
+  });
+  if (!lang) return { ok: false, kind: 'not_found' };
+
+  const [phoneme, group] = await Promise.all([
+    db.query.phonemes.findFirst({
+      where: and(
+        eq(phonemes.id, parsed.data.phoneme_id),
+        eq(phonemes.language_id, parsedId.data),
+      ),
+    }),
+    db.query.phoneme_groups.findFirst({
+      where: and(
+        eq(phoneme_groups.id, parsed.data.group_id),
+        eq(phoneme_groups.language_id, parsedId.data),
+      ),
+    }),
+  ]);
+  if (!phoneme || !group) return { ok: false, kind: 'not_found' };
+
+  const [deleted] = await db
+    .delete(group_memberships)
+    .where(
+      and(
+        eq(group_memberships.group_id, parsed.data.group_id),
+        eq(group_memberships.phoneme_id, parsed.data.phoneme_id),
+      ),
+    )
+    .returning();
+
+  if (!deleted) return { ok: false, kind: 'not_found' };
+  return { ok: true, data: deleted };
+}
 
 /**
  * Deletes a phoneme group, verifying ownership through the language table.
