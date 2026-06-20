@@ -63,6 +63,21 @@ export const createPhonemeSchema = z.object({
   weight: z.number().positive().optional(),
 });
 
+/**
+ * Validates the client-supplied fields for creating a phoneme group.
+ * `language_id` is intentionally absent — it comes from the route segment, not the request body.
+ */
+export const createPhonemeGroupInputSchema = z.object({
+  name: z.string().min(1),
+});
+
+/**
+ * Validates the client-supplied fields for updating a phoneme group.
+ */
+export const updatePhonemeGroupInputSchema = z.object({
+  name: z.string().min(1),
+});
+
 /** Validates a new named phoneme group (e.g. "vowels", "nasals"). */
 export const createPhonemeGroupSchema = z.object({
   language_id: z.uuid(),
