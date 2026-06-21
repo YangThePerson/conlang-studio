@@ -9,7 +9,19 @@ const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
-    await auth.protect();
+    if (req.nextUrl.pathname.startsWith('/api/')) {
+      // API routes must return 401, not redirect to sign-in.
+      // Real auth enforcement happens in each route handler via getOrCreateDbUser().
+      const { userId } = await auth();
+      if (!userId) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      await auth.protect();
+    }
   }
 });
 
