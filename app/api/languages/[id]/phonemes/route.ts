@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
  * Returns all the phonemes in a language owned by the authenticated user.
  * Returns 404 if the language doesn't exist or belongs to another user.
  */
-export async function GET({ params }: Params) {
+export async function GET(_req: Request, { params }: Params) {
   const user = await getOrCreateDbUser();
   if (!user) return new Response(null, { status: 401 });
 
