@@ -47,7 +47,10 @@ function LanguageItem({ lang }: { lang: Language }) {
           className="flex-1 border rounded px-2 py-1"
         />
       ) : (
-        <Link href={`/languages/${lang.id}`} className="flex-1 text-left hover:underline">
+        <Link
+          href={`/languages/${lang.id}`}
+          className="flex-1 text-left hover:underline"
+        >
           {lang.name}
         </Link>
       )}
