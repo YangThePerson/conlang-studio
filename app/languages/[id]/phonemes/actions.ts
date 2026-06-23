@@ -135,9 +135,15 @@ export async function updateGroup(
 
   for (const phonemeId of desiredIds) {
     if (!currentIds.has(phonemeId)) {
-      const r = await addPhonemeToGroupSvc(user, languageId, phonemeId, groupId);
+      const r = await addPhonemeToGroupSvc(
+        user,
+        languageId,
+        phonemeId,
+        groupId,
+      );
       if (!r.ok) {
-        if (r.kind === 'validation') return { ok: false, kind: 'validation', issues: r.issues };
+        if (r.kind === 'validation')
+          return { ok: false, kind: 'validation', issues: r.issues };
         return { ok: false, kind: r.kind };
       }
     }
@@ -145,9 +151,15 @@ export async function updateGroup(
 
   for (const phonemeId of currentIds) {
     if (!desiredIds.has(phonemeId)) {
-      const r = await removePhonemeFromGroupSvc(user, languageId, phonemeId, groupId);
+      const r = await removePhonemeFromGroupSvc(
+        user,
+        languageId,
+        phonemeId,
+        groupId,
+      );
       if (!r.ok && r.kind !== 'not_found') {
-        if (r.kind === 'validation') return { ok: false, kind: 'validation', issues: r.issues };
+        if (r.kind === 'validation')
+          return { ok: false, kind: 'validation', issues: r.issues };
         return { ok: false, kind: r.kind };
       }
     }
