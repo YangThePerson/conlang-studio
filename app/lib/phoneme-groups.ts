@@ -65,6 +65,50 @@ export async function listPhonemeGroupsWithMembersSvc(
 }
 
 /**
+ * Returns all phonemes that are members of a specific group, verifying that the language
+ * is owned by `user` and that the group belongs to that language.
+ * Returns `{ ok: false, kind: 'not_found' }` if the language or group doesn't exist or belongs to another user.
+ */
+export async function getPhonemeMembersInGroupSvc(
+  user: DbUser,
+  rawLanguageId: unknown,
+  rawGroupId: unknown,
+): Promise<Result<Phoneme[]>> {
+  const parsedLangId = uuidSchema.safeParse(rawLanguageId);
+  if (!parsedLangId.success) return { ok: false, kind: 'invalid_id' };
+
+  const parsedGroupId = uuidSchema.safeParse(rawGroupId);
+  if (!parsedGroupId.success) return { ok: false, kind: 'invalid_id' };
+
+  const lang = await db.query.languages.findFirst({
+    where: and(
+      eq(languages.id, parsedLangId.data),
+      eq(languages.user_id, user.id),
+    ),
+  });
+  if (!lang) return { ok: false, kind: 'not_found' };
+
+  const group = await db.query.phoneme_groups.findFirst({
+    where: and(
+      eq(phoneme_groups.id, parsedGroupId.data),
+      eq(phoneme_groups.language_id, parsedLangId.data),
+    ),
+    with: {
+      memberships: {
+        with: { phoneme: true },
+      },
+    },
+  });
+
+  if (!group) return { ok: false, kind: 'not_found' };
+
+  return {
+    ok: true,
+    data: group.memberships.map(({ phoneme }) => phoneme),
+  };
+}
+
+/**
  * Creates a new phoneme group for a language owned by `user`.
  * `language_id` comes from the route, not client input — ownership is verified before insert.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
