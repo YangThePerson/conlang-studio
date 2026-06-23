@@ -3,7 +3,6 @@ import {
   createPhonemeGroupSvc,
   listPhonemeGroupsWithMembersSvc,
 } from '@/app/lib/phoneme-groups';
-import { createPhonemeSvc, listPhonemesSvc } from '@/app/lib/phonemes';
 
 /** Route segment params for language-specific phoneme endpoints. */
 type Params = { params: Promise<{ id: string }> };
