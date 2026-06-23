@@ -39,7 +39,7 @@ export const createLanguageSchema = z.object({
 export const createPhonemeInputSchema = z.object({
   symbol: z.string().min(1),
   ipa: z.string().optional(),
-  weight: z.number().min(0).optional(),
+  weight: z.number().min(0).max(2).optional(),
 });
 
 /**
@@ -60,7 +60,7 @@ export const updatePhonemeInputSchema = z
 export const createPhonemeSchema = z.object({
   language_id: z.uuid(),
   symbol: z.string().min(1),
-  weight: z.number().positive().optional(),
+  weight: z.number().min(0).max(2).optional(),
 });
 
 /**
@@ -71,9 +71,7 @@ export const createPhonemeGroupInputSchema = z.object({
   name: z.string().min(1),
 });
 
-/**
- * Validates the client-supplied fields for updating a phoneme group.
- */
+/** Validates the client-supplied fields for updating a phoneme group. */
 export const updatePhonemeGroupInputSchema = z.object({
   name: z.string().min(1),
 });
@@ -94,7 +92,7 @@ export const createGroupMembershipSchema = z.object({
 export const createSyllableStructureSchema = z.object({
   language_id: z.uuid(),
   template: templateSchema,
-  weight: z.number().positive().optional(),
+  weight: z.number().min(0).max(2).optional(),
 });
 
 /**
