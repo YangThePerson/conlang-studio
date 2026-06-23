@@ -96,6 +96,21 @@ export const createSyllableStructureSchema = z.object({
 });
 
 /**
+ * Validates the client-supplied fields for creating a syllable structure.
+ * `language_id` is intentionally absent — it comes from the route segment, not the request body.
+ */
+export const createSyllableStructureInputSchema = z.object({
+  template: templateSchema,
+  weight: z.number().min(0).max(2).optional(),
+});
+
+/** Validates the client-supplied fields for updating a syllable structure. */
+export const updateSyllableStructureInputSchema = z.object({
+  template: templateSchema,
+  weight: z.number().min(0).max(2).optional(),
+});
+
+/**
  * Validates a new phonological rewrite rule.
  * Exactly one of `target_phoneme_id` or `target_group_id` must be present —
  * the rule matches either a single phoneme or every member of a group.
