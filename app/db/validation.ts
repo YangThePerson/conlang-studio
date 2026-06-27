@@ -166,8 +166,8 @@ export const createLexemeTagSchema = z.object({
  * Deep validation (e.g. maxSyllables >= minSyllables, structures non-empty) is handled in the service.
  */
 export const generateWordsInputSchema = z.object({
-  wordsToGenerate: z.number().int().min(1),
+  wordsToGenerate: z.coerce.number().int().min(1),
   structures: z.array(uuidSchema).min(1),
-  minSyllables: z.number().int().min(1).default(1),
-  maxSyllables: z.number().int().min(1).default(1),
+  minSyllables: z.coerce.number().int().min(1).default(1),
+  maxSyllables: z.coerce.number().int().min(1).default(1),
 });
