@@ -1,0 +1,13 @@
+/** Skeleton shown while the syllables page fetches data. */
+export default function SyllablesLoading() {
+  return (
+    <section className="animate-pulse">
+      <div className="h-8 w-32 bg-gray-600 rounded mb-6" />
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-10 bg-gray-600 rounded" />
+        ))}
+      </div>
+    </section>
+  );
+}
