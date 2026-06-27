@@ -97,11 +97,6 @@ export async function updateSyllableStructureSvc(
     };
   }
 
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
-
   const ownedLanguageIds = db
     .select({ id: languages.id })
     .from(languages)
