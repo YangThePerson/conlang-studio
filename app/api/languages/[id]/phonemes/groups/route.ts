@@ -25,12 +25,14 @@ export async function GET(_req: Request, { params }: Params) {
         ? 404
         : result.kind === 'invalid_id'
           ? 400
-          : 400;
+          : result.kind === 'unauthorized'
+            ? 401
+            : 400;
     const issues = result.kind === 'validation' ? result.issues : undefined;
     return Response.json({ error: result.kind, issues }, { status });
   }
 
-  return Response.json(result.data, { status: 201 });
+  return Response.json(result.data);
 }
 
 /**
@@ -54,7 +56,9 @@ export async function POST(req: Request, { params }: Params) {
         ? 404
         : result.kind === 'invalid_id'
           ? 400
-          : 400;
+          : result.kind === 'unauthorized'
+            ? 401
+            : 400;
     const issues = result.kind === 'validation' ? result.issues : undefined;
     return Response.json({ error: result.kind, issues }, { status });
   }
