@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/app/db';
 import { phonemes, languages, users } from '@/app/db/schema';
@@ -121,6 +121,8 @@ export async function updatePhonemeSvc(
 /**
  * Deletes a phoneme, verifying ownership through the language table.
  * Returns `{ ok: false, kind: 'not_found' }` if the phoneme doesn't exist or belongs to another user's language.
+ * Returns `{ ok: false, kind: 'conflict' }` if any syllable structure template references this phoneme —
+ * the caller should prompt the user to remove it from those templates first.
  */
 export async function deletePhonemeSvc(
   user: DbUser,
@@ -134,14 +136,31 @@ export async function deletePhonemeSvc(
     .from(languages)
     .where(eq(languages.user_id, user.id));
 
-  const [deleted] = await db
-    .delete(phonemes)
+  const [phoneme] = await db
+    .select()
+    .from(phonemes)
     .where(
       and(
         eq(phonemes.id, parsedId.data),
         inArray(phonemes.language_id, ownedLanguageIds),
       ),
     )
+    .limit(1);
+  if (!phoneme) return { ok: false, kind: 'not_found' };
+
+  const { rows } = await db.execute(
+    sql`SELECT EXISTS (
+      SELECT 1
+      FROM syllable_structures, jsonb_array_elements(template) AS slot
+      WHERE syllable_structures.language_id = ${phoneme.language_id}
+      AND slot->>'phonemeId' = ${phoneme.id}
+    ) AS referenced`,
+  );
+  if (rows[0].referenced) return { ok: false, kind: 'conflict' };
+
+  const [deleted] = await db
+    .delete(phonemes)
+    .where(eq(phonemes.id, parsedId.data))
     .returning();
 
   if (!deleted) return { ok: false, kind: 'not_found' };

@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/app/db';
 import {
   group_memberships,
@@ -385,6 +385,8 @@ export async function removePhonemeFromGroupSvc(
 /**
  * Deletes a phoneme group, verifying ownership through the language table.
  * Returns `{ ok: false, kind: 'not_found' }` if the phoneme group doesn't exist or belongs to another user's language.
+ * Returns `{ ok: false, kind: 'conflict' }` if any syllable structure template references this group —
+ * the caller should prompt the user to remove it from those templates first.
  */
 export async function deletePhonemeGroupSvc(
   user: DbUser,
@@ -398,14 +400,31 @@ export async function deletePhonemeGroupSvc(
     .from(languages)
     .where(eq(languages.user_id, user.id));
 
-  const [deleted] = await db
-    .delete(phoneme_groups)
+  const [group] = await db
+    .select()
+    .from(phoneme_groups)
     .where(
       and(
         eq(phoneme_groups.id, parsedId.data),
         inArray(phoneme_groups.language_id, ownedLanguageIds),
       ),
     )
+    .limit(1);
+  if (!group) return { ok: false, kind: 'not_found' };
+
+  const { rows } = await db.execute(
+    sql`SELECT EXISTS (
+      SELECT 1
+      FROM syllable_structures, jsonb_array_elements(template) AS slot
+      WHERE syllable_structures.language_id = ${group.language_id}
+      AND slot->>'groupId' = ${group.id}
+    ) AS referenced`,
+  );
+  if (rows[0].referenced) return { ok: false, kind: 'conflict' };
+
+  const [deleted] = await db
+    .delete(phoneme_groups)
+    .where(eq(phoneme_groups.id, parsedId.data))
     .returning();
 
   if (!deleted) return { ok: false, kind: 'not_found' };
