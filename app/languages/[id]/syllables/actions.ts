@@ -12,6 +12,11 @@ import { revalidatePath } from 'next/cache';
 
 type SyllableStructure = typeof syllable_structures.$inferSelect;
 
+/**
+ * Server Action: creates a new syllable structure for the given language.
+ * The `template` field is JSON-encoded as a hidden input (it's a structured array, not a flat form value),
+ * so it is parsed here before being forwarded to the service.
+ */
 export async function createSyllableStructure(
   languageId: string,
   _prevState: Result<SyllableStructure> | null,
@@ -36,6 +41,10 @@ export async function createSyllableStructure(
   return result;
 }
 
+/**
+ * Server Action: updates the template and weight of an existing syllable structure.
+ * `template` is JSON-encoded as a hidden input (same reason as `createSyllableStructure`).
+ */
 export async function updateSyllableStructure(
   languageId: string,
   structureId: string,
@@ -61,6 +70,10 @@ export async function updateSyllableStructure(
   return result;
 }
 
+/**
+ * Server Action: deletes a syllable structure. `languageId` is used only for cache revalidation
+ * after a successful delete; ownership is enforced inside the service.
+ */
 export async function deleteSyllableStructure(
   languageId: string,
   structureId: string,

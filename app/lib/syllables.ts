@@ -78,7 +78,7 @@ export async function createSyllableStructureSvc(
 /**
  * Updates a syllable structure's template and/or weight.
  * Ownership is verified by requiring the syllable structure's `language_id` to belong to `user`
- * via a subquery on the languages table — there is no direct `user_id` on phonemes.
+ * via a subquery on the languages table — there is no direct `user_id` on syllable_structures.
  */
 export async function updateSyllableStructureSvc(
   user: DbUser,
@@ -124,7 +124,7 @@ export async function updateSyllableStructureSvc(
 
 /**
  * Deletes a syllable structure, verifying ownership through the language table.
- * Returns `{ ok: false, kind: 'not_found' }` if the phoneme doesn't exist or belongs to another user's language.
+ * Returns `{ ok: false, kind: 'not_found' }` if the structure doesn't exist or belongs to another user's language.
  */
 export async function deleteSyllableStructureSvc(
   user: DbUser,

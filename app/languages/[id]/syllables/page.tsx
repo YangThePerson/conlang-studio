@@ -5,7 +5,11 @@ import { listSyllableStructuresSvc } from '@/app/lib/syllables';
 import { redirect } from 'next/navigation';
 import SyllableStructureList from './syllable-structure-list';
 
-/** Syllable structures editor — populated in a future step. */
+/**
+ * Syllable structures page for a language. Fetches phonemes, phoneme groups, and existing
+ * syllable structures, then delegates rendering to `SyllableStructureList`.
+ * Redirects to `/languages` if the language is not found or not owned by the current user.
+ */
 export default async function SyllablesPage({
   params,
 }: PageProps<'/languages/[id]/phonemes'>) {

@@ -16,6 +16,7 @@ type SyllableStructure = typeof syllable_structures.$inferSelect;
 type SyllableTemplate = z.infer<typeof templateSchema>;
 type Slot = SyllableTemplate[number];
 
+/** Gets the name of an item in a syllable template slot. */
 function slotLabel(
   slot: Slot,
   phonemeList: Phoneme[],
@@ -27,6 +28,7 @@ function slotLabel(
   return phonemeList.find((p) => p.id === slot.phonemeId)?.symbol ?? '?';
 }
 
+/** Add Syllable Button. Toggles between single button and reusable Add/Edit from. */
 function AddSyllableStructureForm({
   languageId: languageId,
   phonemes: phonemes,
@@ -74,6 +76,7 @@ function AddSyllableStructureForm({
   );
 }
 
+/** Single syllable row with inline edit (template + weight) and delete. */
 function SyllableStructureRow({
   languageId,
   structure,
@@ -150,6 +153,7 @@ function SyllableStructureRow({
   );
 }
 
+/** Reusable form for adding and/or editing syllables */
 function SyllableStructureForm({
   formAction,
   cancel,
@@ -172,6 +176,7 @@ function SyllableStructureForm({
   const [template, setTemplate] = useState<SyllableTemplate>([...structure]);
   const [weight, setWeight] = useState(initialWeight);
 
+  // newSelection encodes both kind and id as "kind:uuid" so a single <select> covers both groups and phonemes.
   const initialSelection =
     groups.length > 0
       ? `group:${groups[0].id}`
@@ -353,6 +358,11 @@ function SyllableStructureForm({
   );
 }
 
+/**
+ * Client component that renders the full syllable structures UI: an add form and an editable
+ * list of existing structures. Receives server-fetched data as props; mutations go through
+ * Server Actions which revalidate the page after success.
+ */
 export default function SyllableStructureList({
   languageId,
   phonemes,
