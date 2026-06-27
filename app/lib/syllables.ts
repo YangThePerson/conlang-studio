@@ -1,16 +1,71 @@
-import { users, syllable_structures, languages } from '@/app/db/schema';
+import {
+  users,
+  syllable_structures,
+  languages,
+  phonemes,
+  phoneme_groups,
+} from '@/app/db/schema';
 import type { Result } from './result';
 import {
   createSyllableStructureInputSchema,
   updateSyllableStructureInputSchema,
   uuidSchema,
 } from '../db/validation';
+import type { SyllableTemplate } from '../db/json-shapes';
 import { z } from 'zod';
 import { db } from '../db';
 import { and, eq, inArray } from 'drizzle-orm';
 
 type DbUser = typeof users.$inferSelect;
 type SyllableStructure = typeof syllable_structures.$inferSelect;
+
+/**
+ * Verifies that every phoneme and group ID referenced in `template` exists in `languageId`.
+ * Returns `true` if all IDs resolve; `false` if any are missing or belong to a different language.
+ * Called before inserting or updating a syllable structure to prevent dangling JSONB references
+ * that cannot be enforced by a FK constraint.
+ */
+async function validateTemplateReferences(
+  template: SyllableTemplate,
+  languageId: string,
+): Promise<boolean> {
+  const phonemeIds = new Set<string>();
+  const groupIds = new Set<string>();
+  for (const slot of template) {
+    if (slot.kind === 'phoneme') phonemeIds.add(slot.phonemeId);
+    else groupIds.add(slot.groupId);
+  }
+
+  const [foundPhonemes, foundGroups] = await Promise.all([
+    phonemeIds.size
+      ? db
+          .select({ id: phonemes.id })
+          .from(phonemes)
+          .where(
+            and(
+              inArray(phonemes.id, [...phonemeIds]),
+              eq(phonemes.language_id, languageId),
+            ),
+          )
+      : ([] as { id: string }[]),
+    groupIds.size
+      ? db
+          .select({ id: phoneme_groups.id })
+          .from(phoneme_groups)
+          .where(
+            and(
+              inArray(phoneme_groups.id, [...groupIds]),
+              eq(phoneme_groups.language_id, languageId),
+            ),
+          )
+      : ([] as { id: string }[]),
+  ]);
+
+  return (
+    foundPhonemes.length === phonemeIds.size &&
+    foundGroups.length === groupIds.size
+  );
+}
 
 /**
  * Returns all syllable structures for a language, verifying that the language is owned by `user`.
@@ -40,6 +95,8 @@ export async function listSyllableStructuresSvc(
  * Creates a new syllable structure for a language owned by `user`.
  * `language_id` comes from the route, not client input — ownership is verified before insert.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
+ * Returns `{ ok: false, kind: 'validation' }` if the template references phoneme or group IDs
+ * that do not exist in this language — guards against dangling JSONB references.
  */
 export async function createSyllableStructureSvc(
   user: DbUser,
@@ -63,6 +120,14 @@ export async function createSyllableStructureSvc(
   });
   if (!lang) return { ok: false, kind: 'not_found' };
 
+  const valid = await validateTemplateReferences(parsed.data.template, parsedId.data);
+  if (!valid)
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: 'One or more phoneme or group IDs in the template do not exist in this language.',
+    };
+
   const [created] = await db
     .insert(syllable_structures)
     .values({
@@ -77,8 +142,10 @@ export async function createSyllableStructureSvc(
 
 /**
  * Updates a syllable structure's template and/or weight.
- * Ownership is verified by requiring the syllable structure's `language_id` to belong to `user`
- * via a subquery on the languages table — there is no direct `user_id` on syllable_structures.
+ * Fetches the structure first to obtain its `language_id` for the template reference check —
+ * there is no direct `user_id` on syllable_structures, so ownership is verified via a subquery.
+ * Returns `{ ok: false, kind: 'validation' }` if the template references phoneme or group IDs
+ * that do not exist in this language — guards against dangling JSONB references.
  */
 export async function updateSyllableStructureSvc(
   user: DbUser,
@@ -102,15 +169,30 @@ export async function updateSyllableStructureSvc(
     .from(languages)
     .where(eq(languages.user_id, user.id));
 
-  const [updated] = await db
-    .update(syllable_structures)
-    .set(parsed.data)
+  const [existing] = await db
+    .select()
+    .from(syllable_structures)
     .where(
       and(
         eq(syllable_structures.id, parsedId.data),
         inArray(syllable_structures.language_id, ownedLanguageIds),
       ),
     )
+    .limit(1);
+  if (!existing) return { ok: false, kind: 'not_found' };
+
+  const valid = await validateTemplateReferences(parsed.data.template, existing.language_id);
+  if (!valid)
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: 'One or more phoneme or group IDs in the template do not exist in this language.',
+    };
+
+  const [updated] = await db
+    .update(syllable_structures)
+    .set(parsed.data)
+    .where(eq(syllable_structures.id, parsedId.data))
     .returning();
 
   if (!updated) return { ok: false, kind: 'not_found' };
