@@ -159,3 +159,15 @@ export const createLexemeTagSchema = z.object({
   lexeme_id: z.uuid(),
   tag_id: z.uuid(),
 });
+
+/**
+ * Validates the client-supplied body for POST /api/languages/[id]/generate.
+ * `language_id` is intentionally absent — it comes from the route segment, not the request body.
+ * Deep validation (e.g. maxSyllables >= minSyllables, structures non-empty) is handled in the service.
+ */
+export const generateWordsInputSchema = z.object({
+  wordsToGenerate: z.number().int().min(1),
+  structures: z.array(uuidSchema).min(1),
+  minSyllables: z.number().int().min(1).default(1),
+  maxSyllables: z.number().int().min(1).default(1),
+});
