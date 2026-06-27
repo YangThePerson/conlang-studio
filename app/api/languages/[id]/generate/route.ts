@@ -1,0 +1,44 @@
+import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { generateWordSvc } from '@/app/lib/wordgen';
+
+/** Route segment params for language-specific generation endpoints. */
+type Params = { params: Promise<{ id: string }> };
+
+/**
+ * GET /api/languages/[id]/generate
+ * Generates a set of random words for the authenticated user's language.
+ * Query params: `wordsToGenerate`, `structures` (repeatable), `minSyllables?`, `maxSyllables?`
+ * Returns `{ words: string[] }` with status 200. The array may be shorter than `wordsToGenerate`
+ * if the phonological space is too constrained to produce the requested number of unique words.
+ */
+export async function GET(req: Request, { params }: Params) {
+  const user = await getOrCreateDbUser();
+  if (!user) return new Response(null, { status: 401 });
+
+  const { id } = await params;
+  const sp = new URL(req.url).searchParams;
+
+  const rawInput = {
+    wordsToGenerate: sp.get('wordsToGenerate'),
+    structures: sp.getAll('structures'),
+    minSyllables: sp.get('minSyllables'),
+    maxSyllables: sp.get('maxSyllables'),
+  };
+
+  const result = await generateWordSvc(user, id, rawInput);
+
+  if (!result.ok) {
+    const status =
+      result.kind === 'not_found'
+        ? 404
+        : result.kind === 'invalid_id'
+          ? 400
+          : result.kind === 'unauthorized'
+            ? 401
+            : 400;
+    const issues = result.kind === 'validation' ? result.issues : undefined;
+    return Response.json({ error: result.kind, issues }, { status });
+  }
+
+  return Response.json({ words: [...result.data] });
+}
