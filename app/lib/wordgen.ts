@@ -24,6 +24,24 @@ export type literalTemplate = {
   }[];
   weight: number;
 };
+type SyllableStructure = typeof syllable_structures.$inferSelect;
+type GroupComplex = {
+  id: string;
+  name: string;
+  language_id: string;
+  memberships: {
+    group_id: string;
+    phoneme_id: string;
+    phoneme: {
+      symbol: string;
+      id: string;
+      language_id: string;
+      ipa: string | null;
+      weight: number;
+    };
+  }[];
+};
+type Phoneme = typeof phonemes.$inferSelect;
 
 /** Seeded PRNG (mulberry32). Returns a closure with the same signature as Math.random(). */
 export function makeRng(seed: number): Rng {
@@ -101,6 +119,76 @@ export function generateRandomWord(
   return word;
 }
 
+export function separateTemplateIds(parsedStructures: SyllableStructure[]) {
+  const phonemeIds = new Set<string>();
+  const groupIds = new Set<string>();
+  for (const { template } of parsedStructures) {
+    for (const slot of template) {
+      if (slot.kind === 'phoneme') phonemeIds.add(slot.phonemeId);
+      else groupIds.add(slot.groupId);
+    }
+  }
+  return [phonemeIds, groupIds];
+}
+
+export function builtLiteralTemplates(
+  phonemesList: Phoneme[],
+  groupsWithMembersList: GroupComplex[],
+  parsedStructures: SyllableStructure[],
+) {
+  const phonemesById = new Map(phonemesList.map((p) => [p.id, p]));
+  const groupsById = new Map(groupsWithMembersList.map((g) => [g.id, g]));
+
+  /** Templates with weight and phoneme list */
+  const literalTemplates: literalTemplate[] = parsedStructures.map(
+    ({ template, weight }) => ({
+      template: template.map((slot) => {
+        if (slot.kind === 'group')
+          return {
+            phonemes: groupsById
+              .get(slot.groupId)!
+              .memberships.map(({ phoneme: { symbol, ipa, weight } }) => ({
+                symbol,
+                ipa,
+                weight,
+              })),
+            optional: slot.optional,
+          };
+        else {
+          const { symbol, ipa, weight } = phonemesById.get(slot.phonemeId)!;
+          return {
+            phonemes: [{ symbol, ipa, weight }],
+            optional: slot.optional,
+          };
+        }
+      }),
+      weight,
+    }),
+  );
+
+  return literalTemplates;
+}
+
+export function generateWordSet(
+  wordsToGenerate: number,
+  minSyllables: number,
+  maxSyllables: number,
+  syllableStream: Generator<string>,
+  rng: Rng,
+) {
+  const newWords = new Set<string>();
+  const maxAttempts = wordsToGenerate * 10;
+  let attempts = 0;
+  while (newWords.size < wordsToGenerate && attempts < maxAttempts) {
+    newWords.add(
+      generateRandomWord(syllableStream, minSyllables, maxSyllables, rng),
+    );
+    attempts++;
+  }
+
+  return newWords;
+}
+
 /**
  * Generates a set of unique random words for a language owned by `user`.
  * `rawLanguageId` and `rawInput` are untrusted — schema validation and ownership are enforced here.
@@ -157,14 +245,7 @@ export async function generateWordSvc(
 
   if (!parsedStructures.length) return { ok: false, kind: 'not_found' };
 
-  const phonemeIds = new Set<string>();
-  const groupIds = new Set<string>();
-  for (const { template } of parsedStructures) {
-    for (const slot of template) {
-      if (slot.kind === 'phoneme') phonemeIds.add(slot.phonemeId);
-      else groupIds.add(slot.groupId);
-    }
-  }
+  const [phonemeIds, groupIds] = separateTemplateIds(parsedStructures);
 
   const [phonemesList, groupsWithMembersList] = await Promise.all([
     phonemeIds.size
@@ -172,7 +253,7 @@ export async function generateWordSvc(
           .select()
           .from(phonemes)
           .where(inArray(phonemes.id, [...phonemeIds]))
-      : ([] as (typeof phonemes.$inferSelect)[]),
+      : ([] as Phoneme[]),
     groupIds.size
       ? db.query.phoneme_groups.findMany({
           where: inArray(phoneme_groups.id, [...groupIds]),
@@ -184,7 +265,7 @@ export async function generateWordSvc(
             },
           },
         })
-      : [],
+      : ([] as GroupComplex[]),
   ]);
 
   const emptyGroup = groupsWithMembersList.find(
@@ -197,48 +278,22 @@ export async function generateWordSvc(
       issues: `Phoneme group "${emptyGroup.name}" has no members and cannot be used in word generation.`,
     };
 
-  const phonemesById = new Map(phonemesList.map((p) => [p.id, p]));
-  const groupsById = new Map(groupsWithMembersList.map((g) => [g.id, g]));
-
-  /** Templates with weight and phoneme list */
-  const literalTemplates: literalTemplate[] = parsedStructures.map(
-    ({ template, weight }) => ({
-      template: template.map((slot) => {
-        if (slot.kind === 'group')
-          return {
-            phonemes: groupsById
-              .get(slot.groupId)!
-              .memberships.map(({ phoneme: { symbol, ipa, weight } }) => ({
-                symbol,
-                ipa,
-                weight,
-              })),
-            optional: slot.optional,
-          };
-        else {
-          const { symbol, ipa, weight } = phonemesById.get(slot.phonemeId)!;
-          return {
-            phonemes: [{ symbol, ipa, weight }],
-            optional: slot.optional,
-          };
-        }
-      }),
-      weight,
-    }),
+  const literalTemplates = builtLiteralTemplates(
+    phonemesList,
+    groupsWithMembersList,
+    parsedStructures,
   );
 
   const rng = seed !== undefined ? makeRng(seed) : Math.random;
   const syllableStream = generateRandomSyllableStream(literalTemplates, rng);
 
-  const newWords = new Set<string>();
-  const maxAttempts = wordsToGenerate * 10;
-  let attempts = 0;
-  while (newWords.size < wordsToGenerate && attempts < maxAttempts) {
-    newWords.add(
-      generateRandomWord(syllableStream, minSyllables, maxSyllables, rng),
-    );
-    attempts++;
-  }
+  const newWords = generateWordSet(
+    wordsToGenerate,
+    minSyllables,
+    maxSyllables,
+    syllableStream,
+    rng,
+  );
 
   return { ok: true, data: newWords };
 }
