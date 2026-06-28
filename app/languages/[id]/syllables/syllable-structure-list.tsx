@@ -123,9 +123,9 @@ function SyllableStructureRow({
       <div className="flex clex-row mx-3 w-full">
         <p className="flex-2 font-mono">
           Template:
-          {structure.template.map((slot) => {
+          {structure.template.map((slot, i) => {
             const label = slotLabel(slot, phonemes, groups);
-            return <span> {slot.optional ? `(${label})` : label}</span>;
+            return <span key={i}> {slot.optional ? `(${label})` : label}</span>;
           })}
         </p>
         <p className="flex-1 font-mono">Weight: {structure.weight}</p>
