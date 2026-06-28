@@ -15,6 +15,9 @@ import {
   selectRandomItemByWeight,
   generateRandomSyllableStream,
   generateRandomWord,
+  separateTemplateIds,
+  builtLiteralTemplates,
+  generateWordSet,
   generateWordSvc,
 } from '../wordgen';
 
@@ -130,6 +133,114 @@ describe('generateRandomWord', () => {
       expect(word.length).toBeGreaterThanOrEqual(2);
       expect(word.length).toBeLessThanOrEqual(4);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// separateTemplateIds
+// ---------------------------------------------------------------------------
+
+describe('separateTemplateIds', () => {
+  it('collects phoneme ids and leaves groupIds empty when all slots are phonemes', () => {
+    const structures = [
+      { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }] },
+      { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_2, optional: true }] },
+    ] as any;
+    const [phonemeIds, groupIds] = separateTemplateIds(structures);
+    expect(phonemeIds).toEqual(new Set([PHONEME_ID_1, PHONEME_ID_2]));
+    expect(groupIds.size).toBe(0);
+  });
+
+  it('collects group ids and leaves phonemeIds empty when all slots are groups', () => {
+    const structures = [
+      { template: [{ kind: 'group', groupId: GROUP_ID, optional: false }] },
+    ] as any;
+    const [phonemeIds, groupIds] = separateTemplateIds(structures);
+    expect(phonemeIds.size).toBe(0);
+    expect(groupIds).toEqual(new Set([GROUP_ID]));
+  });
+
+  it('deduplicates ids that appear in multiple structures', () => {
+    const structures = [
+      { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }] },
+      { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }] },
+    ] as any;
+    const [phonemeIds] = separateTemplateIds(structures);
+    expect(phonemeIds.size).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// builtLiteralTemplates
+// ---------------------------------------------------------------------------
+
+describe('builtLiteralTemplates', () => {
+  it('maps a phoneme slot to the phoneme symbol/ipa/weight', () => {
+    const phonemesList = [
+      { id: PHONEME_ID_1, symbol: 'k', ipa: 'k', weight: 2, language_id: LANG_ID },
+    ];
+    const structures = [{
+      id: STRUCT_ID, language_id: LANG_ID, weight: 3,
+      template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }],
+    }] as any;
+    const result = builtLiteralTemplates(phonemesList, [], structures);
+    expect(result).toHaveLength(1);
+    expect(result[0].weight).toBe(3);
+    expect(result[0].template[0].optional).toBe(false);
+    expect(result[0].template[0].phonemes).toEqual([{ symbol: 'k', ipa: 'k', weight: 2 }]);
+  });
+
+  it('maps a group slot to all of its members', () => {
+    const group = {
+      id: GROUP_ID, name: 'vowels', language_id: LANG_ID,
+      memberships: [
+        { group_id: GROUP_ID, phoneme_id: PHONEME_ID_1, phoneme: { id: PHONEME_ID_1, symbol: 'a', ipa: 'a', weight: 1, language_id: LANG_ID } },
+        { group_id: GROUP_ID, phoneme_id: PHONEME_ID_2, phoneme: { id: PHONEME_ID_2, symbol: 'e', ipa: 'e', weight: 3, language_id: LANG_ID } },
+      ],
+    };
+    const structures = [{
+      id: STRUCT_ID, language_id: LANG_ID, weight: 1,
+      template: [{ kind: 'group', groupId: GROUP_ID, optional: true }],
+    }] as any;
+    const result = builtLiteralTemplates([], [group], structures);
+    expect(result[0].template[0].optional).toBe(true);
+    expect(result[0].template[0].phonemes).toEqual(
+      expect.arrayContaining([
+        { symbol: 'a', ipa: 'a', weight: 1 },
+        { symbol: 'e', ipa: 'e', weight: 3 },
+      ]),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateWordSet
+// ---------------------------------------------------------------------------
+
+describe('generateWordSet', () => {
+  function* uniqueSyllables(): Generator<string> {
+    let n = 0;
+    while (true) yield `w${n++}`;
+  }
+
+  function* repeatSyllable(s: string): Generator<string> {
+    while (true) yield s;
+  }
+
+  it('returns the requested number of words when the phonological space is large enough', () => {
+    const words = generateWordSet(5, 1, 1, uniqueSyllables(), () => 0);
+    expect(words.size).toBe(5);
+  });
+
+  it('returns fewer than requested when the space is too constrained', () => {
+    // Only one possible word exists: 'kaka' (fixed syllable, fixed 2-syllable count)
+    const words = generateWordSet(5, 2, 2, repeatSyllable('ka'), () => 0);
+    expect(words.size).toBe(1);
+  });
+
+  it('never returns duplicate words', () => {
+    const words = generateWordSet(10, 1, 1, uniqueSyllables(), () => 0);
+    expect(new Set([...words]).size).toBe(words.size);
   });
 });
 
