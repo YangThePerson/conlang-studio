@@ -12,7 +12,8 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { Result } from './result';
 
 type DbUser = typeof users.$inferSelect;
-type literalTemplate = {
+export type Rng = () => number;
+export type literalTemplate = {
   template: {
     phonemes: {
       symbol: string;
@@ -24,7 +25,21 @@ type literalTemplate = {
   weight: number;
 };
 
-function selectRandomItemByWeight<T extends { weight: number }>(items: T[]): T {
+/** Seeded PRNG (mulberry32). Returns a closure with the same signature as Math.random(). */
+export function makeRng(seed: number): Rng {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function selectRandomItemByWeight<T extends { weight: number }>(
+  items: T[],
+  rng: Rng,
+): T {
   const weightScaledItems = items.map((item) => ({
     ...item,
     scaledWeight: Math.round(item.weight * 10),
@@ -36,10 +51,10 @@ function selectRandomItemByWeight<T extends { weight: number }>(items: T[]): T {
   );
 
   if (totalWeight === 0) {
-    return items[Math.floor(Math.random() * items.length)];
+    return items[Math.floor(rng() * items.length)];
   }
 
-  let random = Math.floor(Math.random() * totalWeight);
+  let random = Math.floor(rng() * totalWeight);
 
   for (const item of weightScaledItems) {
     random -= item.scaledWeight;
@@ -51,19 +66,20 @@ function selectRandomItemByWeight<T extends { weight: number }>(items: T[]): T {
   return items[items.length - 1];
 }
 
-function* generateRandomSyllableStream(
+export function* generateRandomSyllableStream(
   templates: literalTemplate[],
+  rng: Rng,
 ): Generator<string> {
   while (true) {
-    const selected = selectRandomItemByWeight(templates);
+    const selected = selectRandomItemByWeight(templates, rng);
 
     let newSyllable = '';
     // If all optional slots are skipped and the syllable ends up empty, re-attempt
     do
       for (let i = 0; i < selected.template.length; i++) {
         const slot = selected.template[i];
-        if (slot.optional && Math.random() < 0.5) continue;
-        const nextPhoneme = selectRandomItemByWeight(slot.phonemes);
+        if (slot.optional && rng() < 0.5) continue;
+        const nextPhoneme = selectRandomItemByWeight(slot.phonemes, rng);
         newSyllable += nextPhoneme.symbol;
       }
     while (newSyllable.length === 0);
@@ -72,15 +88,15 @@ function* generateRandomSyllableStream(
   }
 }
 
-function generateRandomWord(
+export function generateRandomWord(
   generator: Generator<string>,
   minSyllables: number,
   maxSyllables: number,
+  rng: Rng,
 ): string {
   let word = '';
   const syllableCount =
-    Math.floor(Math.random() * (maxSyllables - minSyllables + 1)) +
-    minSyllables;
+    Math.floor(rng() * (maxSyllables - minSyllables + 1)) + minSyllables;
   for (let i = 0; i < syllableCount; i++) word += generator.next().value;
   return word;
 }
@@ -92,11 +108,15 @@ function generateRandomWord(
  * The returned Set may contain fewer entries than `wordsToGenerate` if the phonological space is
  * too constrained to produce that many unique words within 10× `wordsToGenerate` generation attempts.
  * Callers should check `data.size` against `wordsToGenerate` to detect and surface a partial result.
+ *
+ * Pass `seed` to make word generation deterministic — the same seed and language definition always
+ * produce the same word list. Omit it for random output in production.
  */
 export async function generateWordSvc(
   user: DbUser,
   rawLanguageId: unknown,
   rawInput: unknown,
+  seed?: number,
 ): Promise<Result<Set<string>>> {
   const parsedInput = generateWordsInputSchema.safeParse(rawInput);
   if (!parsedInput.success)
@@ -207,14 +227,15 @@ export async function generateWordSvc(
     }),
   );
 
-  const syllableStream = generateRandomSyllableStream(literalTemplates);
+  const rng = seed !== undefined ? makeRng(seed) : Math.random;
+  const syllableStream = generateRandomSyllableStream(literalTemplates, rng);
 
   const newWords = new Set<string>();
   const maxAttempts = wordsToGenerate * 10;
   let attempts = 0;
   while (newWords.size < wordsToGenerate && attempts < maxAttempts) {
     newWords.add(
-      generateRandomWord(syllableStream, minSyllables, maxSyllables),
+      generateRandomWord(syllableStream, minSyllables, maxSyllables, rng),
     );
     attempts++;
   }
