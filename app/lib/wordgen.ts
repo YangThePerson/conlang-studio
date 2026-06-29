@@ -13,7 +13,7 @@ import { Result } from './result';
 
 type DbUser = typeof users.$inferSelect;
 export type Rng = () => number;
-export type literalTemplate = {
+export type LiteralTemplate = {
   template: {
     phonemes: {
       symbol: string;
@@ -85,7 +85,7 @@ export function selectRandomItemByWeight<T extends { weight: number }>(
 }
 
 export function* generateRandomSyllableStream(
-  templates: literalTemplate[],
+  templates: LiteralTemplate[],
   rng: Rng,
 ): Generator<string> {
   while (true) {
@@ -119,7 +119,9 @@ export function generateRandomWord(
   return word;
 }
 
-export function separateTemplateIds(parsedStructures: SyllableStructure[]) {
+export function separateTemplateIds(
+  parsedStructures: SyllableStructure[],
+): [Set<string>, Set<string>] {
   const phonemeIds = new Set<string>();
   const groupIds = new Set<string>();
   for (const { template } of parsedStructures) {
@@ -140,7 +142,7 @@ export function builtLiteralTemplates(
   const groupsById = new Map(groupsWithMembersList.map((g) => [g.id, g]));
 
   /** Templates with weight and phoneme list */
-  const literalTemplates: literalTemplate[] = parsedStructures.map(
+  const literalTemplates: LiteralTemplate[] = parsedStructures.map(
     ({ template, weight }) => ({
       template: template.map((slot) => {
         if (slot.kind === 'group')
