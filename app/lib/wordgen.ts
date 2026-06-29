@@ -54,33 +54,21 @@ export function makeRng(seed: number): Rng {
   };
 }
 
+/**
+ *  Selects a random item in an array based on weight prop
+ * 0 <= Weight <= 2 (step: 0.1)
+ */
 export function selectRandomItemByWeight<T extends { weight: number }>(
   items: T[],
   rng: Rng,
 ): T {
-  const weightScaledItems = items.map((item) => ({
-    ...item,
-    scaledWeight: Math.round(item.weight * 10),
-  }));
-
-  const totalWeight = weightScaledItems.reduce(
-    (sum, item) => sum + item.scaledWeight,
-    0,
-  );
-
-  if (totalWeight === 0) {
-    return items[Math.floor(rng() * items.length)];
+  const total = items.reduce((sum, i) => sum + i.weight, 0);
+  if (total === 0) return items[Math.floor(rng() * items.length)];
+  let r = rng() * total;
+  for (const item of items) {
+    r -= item.weight;
+    if (r < 0) return item;
   }
-
-  let random = Math.floor(rng() * totalWeight);
-
-  for (const item of weightScaledItems) {
-    random -= item.scaledWeight;
-    if (random < 0) {
-      return item;
-    }
-  }
-
   return items[items.length - 1];
 }
 
