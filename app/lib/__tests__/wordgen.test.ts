@@ -366,7 +366,8 @@ describe('generateWordSvc', () => {
     expect(result1.ok).toBe(true);
     expect(result2.ok).toBe(true);
     if (result1.ok && result2.ok) {
-      expect([...result1.data]).toEqual([...result2.data]);
+      expect(result1.data.requested).toBe(5);
+      expect([...result1.data.words]).toEqual([...result2.data.words]);
     }
   });
 });
