@@ -10,7 +10,12 @@ import {
   check,
   unique,
 } from 'drizzle-orm/pg-core';
-import { SyllableTemplate, RuleContext } from './json-shapes';
+import {
+  SyllableTemplate,
+  RuleContext,
+  LEXEME_ORIGINS,
+  LexemeOrigin,
+} from './json-shapes';
 
 // ---------------------------------------------------------------------------
 // Tables
@@ -132,15 +137,32 @@ export const rules = pgTable(
   ],
 );
 
-/** A dictionary entry (word form) in a language. A lexeme can have multiple senses. */
-export const lexemes = pgTable('lexemes', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  language_id: uuid('language_id')
-    .notNull()
-    .references(() => languages.id, { onDelete: 'cascade' }),
-  term: text('term').notNull(),
-  notes: text('notes'),
-});
+/**
+ * A dictionary entry (word form) in a language. A lexeme can have multiple senses.
+ * `origin` records whether the term was banked from wordgen or typed by hand — it
+ * drives the (future) irregularity warning, which only applies to manual entries.
+ */
+export const lexemes = pgTable(
+  'lexemes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    language_id: uuid('language_id')
+      .notNull()
+      .references(() => languages.id, { onDelete: 'cascade' }),
+    term: text('term').notNull(),
+    notes: text('notes'),
+    origin: text('origin').notNull().default('manual').$type<LexemeOrigin>(),
+  },
+  (t) => [
+    check(
+      'origin_check',
+      sql`${t.origin} IN (${sql.join(
+        LEXEME_ORIGINS.map((o) => sql.raw(`'${o}'`)),
+        sql.raw(', '),
+      )})`,
+    ),
+  ],
+);
 
 /** One meaning of a lexeme, with its part of speech and definition. */
 export const senses = pgTable('senses', {

@@ -47,3 +47,11 @@ export type SyllableTemplate = z.infer<typeof templateSchema>;
 
 /** A validated rule context — the left or right phonological environment of a rule. */
 export type RuleContext = z.infer<typeof contextSchema>;
+
+/**
+ * How a lexeme's term came into existence: banked from wordgen output, or typed
+ * by the user. Set once at creation by the calling service — never client-supplied.
+ */
+export const LEXEME_ORIGINS = ['generated', 'manual'] as const;
+
+export type LexemeOrigin = (typeof LEXEME_ORIGINS)[number];

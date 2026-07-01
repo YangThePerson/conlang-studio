@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { templateSchema, contextSchema } from './json-shapes';
+import { templateSchema, contextSchema, LEXEME_ORIGINS } from './json-shapes';
 
 /** Validates any UUID string — used to sanitize id params in actions and route handlers. */
 export const uuidSchema = z.uuid();
@@ -134,11 +134,17 @@ export const createRuleSchema = z
     },
   );
 
-/** Validates a new lexeme (dictionary entry). `notes` is optional free-form text. */
+/**
+ * Validates a new lexeme (dictionary entry). `notes` is optional free-form text.
+ * `origin` is intentionally required (no default) here — it is set by the calling
+ * service ('manual' from the dictionary create action, 'generated' from wordgen
+ * banking), never taken from client input, and the two call sites must say which.
+ */
 export const createLexemeSchema = z.object({
   language_id: z.uuid(),
   term: z.string().min(1),
   notes: z.string().optional(),
+  origin: z.enum(LEXEME_ORIGINS),
 });
 
 /** Validates a new sense (meaning) attached to a lexeme. */
