@@ -183,9 +183,11 @@ export function generateWordSet(
  * Generates a set of unique random words for a language owned by `user`.
  * `rawLanguageId` and `rawInput` are untrusted — schema validation and ownership are enforced here.
  *
- * The returned Set may contain fewer entries than `wordsToGenerate` if the phonological space is
- * too constrained to produce that many unique words within 10× `wordsToGenerate` generation attempts.
- * Callers should check `data.size` against `wordsToGenerate` to detect and surface a partial result.
+ * `data.words` may contain fewer entries than `data.requested` if the phonological space is too
+ * constrained to produce that many unique words within 10× `wordsToGenerate` generation attempts
+ * (including zero, if every attempt collided or the space is a single word). `requested` is
+ * returned alongside so callers can detect and surface a partial result without threading
+ * `wordsToGenerate` back in from their own scope.
  *
  * Pass `seed` to make word generation deterministic — the same seed and language definition always
  * produce the same word list. Omit it for random output in production.
@@ -195,7 +197,7 @@ export async function generateWordSvc(
   rawLanguageId: unknown,
   rawInput: unknown,
   seed?: number,
-): Promise<Result<Set<string>>> {
+): Promise<Result<{ words: Set<string>; requested: number }>> {
   const parsedInput = generateWordsInputSchema.safeParse(rawInput);
   if (!parsedInput.success)
     return {
@@ -285,5 +287,5 @@ export async function generateWordSvc(
     rng,
   );
 
-  return { ok: true, data: newWords };
+  return { ok: true, data: { words: newWords, requested: wordsToGenerate } };
 }
