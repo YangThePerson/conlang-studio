@@ -8,8 +8,8 @@ type Params = { params: Promise<{ id: string }> };
  * GET /api/languages/[id]/generate
  * Generates a set of random words for the authenticated user's language.
  * Query params: `wordsToGenerate`, `structures` (repeatable), `minSyllables?`, `maxSyllables?`
- * Returns `{ words: string[] }` with status 200. The array may be shorter than `wordsToGenerate`
- * if the phonological space is too constrained to produce the requested number of unique words.
+ * Returns `{ words: string[]; requested: number, got: number }` with status 200. `words` may be shorter than
+ * `requested` if the phonological space is too constrained to produce that many unique words.
  */
 export async function GET(req: Request, { params }: Params) {
   const user = await getOrCreateDbUser();
@@ -40,5 +40,9 @@ export async function GET(req: Request, { params }: Params) {
     return Response.json({ error: result.kind, issues }, { status });
   }
 
-  return Response.json({ words: [...result.data] });
+  return Response.json({
+    words: [...result.data.words],
+    requested: result.data.requested,
+    got: result.data.words.size,
+  });
 }
