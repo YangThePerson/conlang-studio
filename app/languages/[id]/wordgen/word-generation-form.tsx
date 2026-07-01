@@ -7,6 +7,11 @@ import { generateWords } from './actions';
 
 type SyllableStructure = typeof syllable_structures.$inferSelect;
 
+/**
+ * Controls panel for triggering word generation. `setWords`/`setShortfall`/`setPending` are
+ * lifted to the parent so `WordPanel` (a sibling, not a child) can render the result — this
+ * component only owns the min/max syllable inputs and the pending state of its own transition.
+ */
 function WordGenControls({
   setWords,
   setShortfall,
@@ -29,7 +34,7 @@ function WordGenControls({
     startGenerating(async () => {
       const result = await generateWords(
         languageId,
-        20,
+        20, // fixed batch size — not yet exposed as a user-facing setting
         structures.map(({ id }) => id),
         minSyllables,
         maxSyllables,
@@ -57,6 +62,8 @@ function WordGenControls({
     });
   };
 
+  // Mirrors this component's own transition state up to the parent so WordPanel
+  // (a sibling, not a descendant of this transition) can show its own pending UI.
   useEffect(() => {
     setPending(pending);
   }, [pending]);
@@ -109,6 +116,11 @@ function WordGenControls({
   );
 }
 
+/**
+ * Renders the generated word list, or an empty/pending placeholder. `shortfall` is non-null
+ * only when `generateWordSvc` returned fewer unique words than requested (phonological space
+ * too constrained), and surfaces as a warning above the list rather than an error.
+ */
 function WordPanel({
   words,
   pending,
@@ -149,6 +161,11 @@ function WordPanel({
   );
 }
 
+/**
+ * Client Component: word generation UI for a language. Owns the generated-words state so it
+ * can be shared between `WordGenControls` (which produces it via a Server Action) and
+ * `WordPanel` (which displays it) without either needing direct access to the other.
+ */
 export default function WordGenerationForm({
   languageId,
   structures,

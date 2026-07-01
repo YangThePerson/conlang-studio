@@ -5,6 +5,11 @@ import { Result } from '@/app/lib/result';
 import { generateWordSvc } from '@/app/lib/wordgen';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * Server Action: generates a set of random words for the language's syllable structures.
+ * No seed is passed, so `generateWordSvc` uses `Math.random` — output is non-deterministic,
+ * matching the "Generate" button's expected behavior of a fresh list each click.
+ */
 export async function generateWords(
   languageId: string,
   wordsToGenerate: number,
