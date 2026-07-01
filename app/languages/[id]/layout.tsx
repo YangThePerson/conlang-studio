@@ -10,7 +10,7 @@ export default async function LanguageLayout({
     <div className="flex flex-1">
       <SideBar languageId={id} />
       <div className="flex-1">
-        <main className="p-4 md:p-6">{children}</main>
+        <main className="p-4 md:p-6 h-full">{children}</main>
       </div>
     </div>
   );
