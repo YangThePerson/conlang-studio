@@ -12,7 +12,7 @@ import SyllableStructureList from './syllable-structure-list';
  */
 export default async function SyllablesPage({
   params,
-}: PageProps<'/languages/[id]/phonemes'>) {
+}: PageProps<'/languages/[id]/syllables'>) {
   const { id } = await params;
 
   const user = await getOrCreateDbUser();

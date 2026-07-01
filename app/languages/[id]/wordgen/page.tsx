@@ -9,7 +9,7 @@ import WordGenerationForm from './word-generation-form';
  */
 export default async function WordgenPage({
   params,
-}: PageProps<'/languages/[id]/phonemes'>) {
+}: PageProps<'/languages/[id]/wordgen'>) {
   const { id } = await params;
 
   const user = await getOrCreateDbUser();

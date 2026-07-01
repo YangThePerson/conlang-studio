@@ -27,6 +27,6 @@ export async function generateWords(
     maxSyllables,
   });
 
-  if (result.ok) revalidatePath(`/languages/${languageId}/syllables`);
+  if (result.ok) revalidatePath(`/languages/${languageId}/wordgen`);
   return result;
 }
