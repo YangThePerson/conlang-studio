@@ -141,7 +141,6 @@ export const createRuleSchema = z
  * banking), never taken from client input, and the two call sites must say which.
  */
 export const createLexemeSchema = z.object({
-  language_id: z.uuid(),
   term: z.string().min(1),
   notes: z.string().optional(),
   origin: z.enum(LEXEME_ORIGINS),
@@ -156,9 +155,26 @@ export const addGeneratedLexemeInputSchema = z.object({
   term: z.string().min(1),
 });
 
+export const updateLexemeInputSchema = z.object({
+  term: z.string().min(1),
+  notes: z.string().optional(),
+  origin: z.enum(LEXEME_ORIGINS),
+});
+
 /** Validates a new sense (meaning) attached to a lexeme. */
 export const createSenseSchema = z.object({
   lexeme_id: z.uuid(),
+  part_of_speech: z.string(),
+  definition: z.string(),
+});
+
+/**
+ * Validates the client-supplied fields for updating a sense.
+ * `lexeme_id` is intentionally absent — a sense can never be moved to another
+ * lexeme; the sense being updated is identified by an id argument validated
+ * with `uuidSchema`.
+ */
+export const updateSenseInputSchema = z.object({
   part_of_speech: z.string(),
   definition: z.string(),
 });
