@@ -1,9 +1,13 @@
 'use server';
 
+import { lexemes } from '@/app/db/schema';
+import { addGeneratedWordSvc } from '@/app/lib/dictionary';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import { Result } from '@/app/lib/result';
 import { generateWordSvc } from '@/app/lib/wordgen';
 import { revalidatePath } from 'next/cache';
+
+type Lexeme = typeof lexemes.$inferSelect;
 
 /**
  * Server Action: generates a set of random words for the language's syllable structures.
@@ -28,5 +32,23 @@ export async function generateWords(
   });
 
   if (result.ok) revalidatePath(`/languages/${languageId}/wordgen`);
+  return result;
+}
+
+/**
+ * Server Action: banks a single generated word into the language's dictionary as a
+ * lexeme with origin 'generated'. Delegates to `addGeneratedWordSvc` — see its JSDoc
+ * for why origin is not client-supplied.
+ */
+export async function addWordToDictionary(
+  languageId: string,
+  word: string,
+): Promise<Result<Lexeme>> {
+  const user = await getOrCreateDbUser();
+  if (!user) return { ok: false, kind: 'unauthorized' };
+
+  const result = await addGeneratedWordSvc(user, languageId, { term: word });
+
+  if (result.ok) revalidatePath(`/languages/${languageId}/dictionary`);
   return result;
 }

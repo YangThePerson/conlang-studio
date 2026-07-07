@@ -147,6 +147,15 @@ export const createLexemeSchema = z.object({
   origin: z.enum(LEXEME_ORIGINS),
 });
 
+/**
+ * Validates the client-supplied body for banking a generated word into the dictionary.
+ * `language_id` is intentionally absent (comes from the route segment/action argument) and
+ * `origin` is intentionally absent — this operation always sets it to 'generated' server-side.
+ */
+export const addGeneratedLexemeInputSchema = z.object({
+  term: z.string().min(1),
+});
+
 /** Validates a new sense (meaning) attached to a lexeme. */
 export const createSenseSchema = z.object({
   lexeme_id: z.uuid(),

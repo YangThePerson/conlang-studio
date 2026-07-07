@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 import { syllable_structures } from '@/app/db/schema';
 import { redirect } from 'next/navigation';
-import { generateWords } from './actions';
+import { addWordToDictionary, generateWords } from './actions';
 
 type SyllableStructure = typeof syllable_structures.$inferSelect;
 
@@ -54,6 +54,7 @@ function WordGenControls({
       }
 
       setError(null);
+      setPending(true);
       const { words, requested } = result.data;
       setWords([...words]);
       setShortfall(
@@ -123,13 +124,41 @@ function WordGenControls({
  */
 function WordPanel({
   words,
-  pending,
+  generationPending,
   shortfall,
+  languageId,
 }: {
   words: string[];
-  pending: boolean;
+  generationPending: boolean;
   shortfall: { got: number; requested: number } | null;
+  languageId: string;
 }) {
+  const [addWordPending, addWordTransition] = useTransition();
+  const [addedWords, setAddedWords] = useState<Set<string>>(new Set());
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const addWord = (word: string) => {
+    addWordTransition(async () => {
+      const result = await addWordToDictionary(languageId, word);
+
+      if (!result.ok) {
+        setAddError(
+          result.kind === 'validation'
+            ? 'Invalid word.'
+            : result.kind === 'not_found'
+              ? 'Language not found.'
+              : result.kind === 'unauthorized'
+                ? 'You must be signed in to add words.'
+                : 'Something went wrong. Please try again.',
+        );
+        return;
+      }
+
+      setAddError(null);
+      setAddedWords((prev) => new Set(prev).add(word));
+    });
+  };
+
   if (!words.length)
     return (
       <div className="flex-2 py-4 px-16 border rounded flex flex-col justify-center items-center gap-4">
@@ -137,7 +166,7 @@ function WordPanel({
       </div>
     );
 
-  if (pending)
+  if (generationPending)
     return (
       <div className="flex-2 py-4 px-16 border rounded flex flex-col justify-center items-center gap-4">
         <p className="text-gray-500">Generating words...</p>
@@ -145,17 +174,34 @@ function WordPanel({
     );
 
   return (
-    <div className="flex-2 py-4 px-16 border rounded flex flex-col justify-center items-start gap-2">
+    <div className="flex-2 border rounded flex flex-col justify-center items-start gap-2">
       {shortfall && (
         <p className="text-amber-600 text-sm">
           Only generated {shortfall.got} of {shortfall.requested} words — the
           phonological space is too constrained for more unique words.
         </p>
       )}
-      <ul className="flex flex-col items-start font-mono gap-2">
-        {words.map((word, i) => (
-          <li key={i}>{word}</li>
-        ))}
+      {addError && <p className="text-red-500 text-sm">{addError}</p>}
+      <ul className="flex flex-1 flex-col font-mono justify-around w-full">
+        {words.map((word, i) => {
+          const added = addedWords.has(word);
+          return (
+            <li
+              className={`flex flex-1 items-center justify-between hover:bg-zinc-900`}
+              key={i}
+            >
+              <span className="ml-12">{word}</span>
+              <button
+                onClick={() => addWord(word)}
+                title={added ? 'Added to Dictionary' : 'Add to Dictionary'}
+                disabled={added || addWordPending}
+                className="w-fit h-fit rounded mr-2 bg-teal-700 text-white px-4 disabled:opacity-50 cursor-pointer"
+              >
+                {added ? '✓' : '+'}
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -191,9 +237,10 @@ export default function WordGenerationForm({
         setPending={setGeneratingPending}
       />
       <WordPanel
-        pending={generatingPending}
+        generationPending={generatingPending}
         words={words}
         shortfall={shortfall}
+        languageId={languageId}
       />
     </div>
   );
