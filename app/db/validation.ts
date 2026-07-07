@@ -159,8 +159,8 @@ export const addGeneratedLexemeInputSchema = z.object({
 /** Validates a new sense (meaning) attached to a lexeme. */
 export const createSenseSchema = z.object({
   lexeme_id: z.uuid(),
-  part_of_speech: z.string().min(1),
-  definition: z.string().min(1),
+  part_of_speech: z.string(),
+  definition: z.string(),
 });
 
 /** Validates a new tag for categorizing lexemes within a language. */

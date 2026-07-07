@@ -1,21 +1,32 @@
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db';
-import { languages, lexemes, users } from '../db/schema';
-import { addGeneratedLexemeInputSchema, uuidSchema } from '../db/validation';
+import { languages, lexemes, senses, tags, users } from '../db/schema';
+import {
+  addGeneratedLexemeInputSchema,
+  createSenseSchema,
+  uuidSchema,
+} from '../db/validation';
 import { Result } from './result';
 
 type Lexeme = typeof lexemes.$inferSelect;
+type Sense = typeof senses.$inferSelect;
+type Tag = typeof tags.$inferSelect;
 type DbUser = typeof users.$inferSelect;
 
+type CompleteLexeme = Lexeme & {
+  senses: Sense[];
+  tags: Tag[];
+};
+
 /**
- * Returns all lexemes for a language, verifying that the language is owned by `user`.
+ * Returns all lexemes for a language including senses and tags, verifying that the language is owned by `user`.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  */
 export async function getDictionarySvc(
   user: DbUser,
   rawLanguageId: unknown,
-): Promise<Result<Lexeme[]>> {
+): Promise<Result<CompleteLexeme[]>> {
   const parsedId = uuidSchema.safeParse(rawLanguageId);
   if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
 
@@ -24,12 +35,21 @@ export async function getDictionarySvc(
   });
   if (!lang) return { ok: false, kind: 'not_found' };
 
-  const rows = await db
-    .select()
-    .from(lexemes)
-    .where(eq(lexemes.language_id, lang.id));
+  const rows = await db.query.lexemes.findMany({
+    where: eq(lexemes.language_id, lang.id),
+    with: {
+      senses: true,
+      tags: { with: { tag: true } },
+    },
+  });
 
-  return { ok: true, data: rows };
+  return {
+    ok: true,
+    data: rows.map(({ tags, ...row }, i) => ({
+      ...row,
+      tags: tags.map(({ tag }) => tag as Tag),
+    })),
+  };
 }
 
 /**
@@ -68,6 +88,32 @@ export async function addGeneratedWordSvc(
       origin: 'generated',
     })
     .returning();
+
+  return { ok: true, data: row };
+}
+
+export async function addSenseToWordSvc(
+  user: DbUser,
+  rawLanguageId: unknown,
+  rawInput: unknown,
+): Promise<Result<Sense>> {
+  const parsedId = uuidSchema.safeParse(rawLanguageId);
+  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+
+  const parsedInput = createSenseSchema.safeParse(rawInput);
+  if (!parsedInput.success)
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: z.treeifyError(parsedInput.error),
+    };
+
+  const lang = await db.query.languages.findFirst({
+    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
+  });
+  if (!lang) return { ok: false, kind: 'not_found' };
+
+  const [row] = await db.insert(senses).values(parsedInput.data).returning();
 
   return { ok: true, data: row };
 }

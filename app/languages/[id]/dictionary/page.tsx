@@ -1,6 +1,7 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import { getDictionarySvc } from '@/app/lib/dictionary';
 import { redirect } from 'next/navigation';
+import DictionaryTable from './dictionary-table';
 
 /** Dictionary editor — populated in a future step. */
 export default async function DictionaryPage({
@@ -11,8 +12,8 @@ export default async function DictionaryPage({
   const user = await getOrCreateDbUser();
   if (!user) redirect('/sign-in');
 
-  const lexemes = await getDictionarySvc(user, id);
-  if (!lexemes) redirect('/languages');
+  const dictionary = await getDictionarySvc(user, id);
+  if (!dictionary.ok) redirect('/languages');
 
-  return <div />;
+  return <DictionaryTable dictionary={dictionary.data} />;
 }
