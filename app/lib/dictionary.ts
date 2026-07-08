@@ -121,6 +121,7 @@ export async function addManualWordSvc(
     .values({
       language_id: lang.id,
       term: parsedInput.data.term,
+      notes: parsedInput.data.notes,
       origin: 'manual',
     })
     .returning();
