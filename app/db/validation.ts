@@ -155,28 +155,38 @@ export const addGeneratedLexemeInputSchema = z.object({
   term: z.string().min(1),
 });
 
+/**
+ * Validates the client-supplied fields for updating a lexeme.
+ * `origin` is intentionally absent — provenance is set once at creation by the
+ * calling service (see `createLexemeSchema`) and editing a word never changes it.
+ */
 export const updateLexemeInputSchema = z.object({
   term: z.string().min(1),
   notes: z.string().optional(),
-  origin: z.enum(LEXEME_ORIGINS),
 });
 
-/** Validates a new sense (meaning) attached to a lexeme. */
+/**
+ * Validates a new sense (meaning) attached to a lexeme. `definition` must be
+ * non-empty so a sense is never created blank — a blank sense renders
+ * identically to "no senses" in the dictionary table. `part_of_speech` may be
+ * empty (not every conlang entry has one pinned down yet).
+ */
 export const createSenseSchema = z.object({
   lexeme_id: z.uuid(),
-  part_of_speech: z.string(),
-  definition: z.string(),
+  part_of_speech: z.string().min(1),
+  definition: z.string().min(1),
 });
 
 /**
  * Validates the client-supplied fields for updating a sense.
  * `lexeme_id` is intentionally absent — a sense can never be moved to another
  * lexeme; the sense being updated is identified by an id argument validated
- * with `uuidSchema`.
+ * with `uuidSchema`. `definition` must stay non-empty for the same reason as
+ * in `createSenseSchema`.
  */
 export const updateSenseInputSchema = z.object({
-  part_of_speech: z.string(),
-  definition: z.string(),
+  part_of_speech: z.string().min(1),
+  definition: z.string().min(1),
 });
 
 /** Validates a new tag for categorizing lexemes within a language. */
