@@ -453,7 +453,6 @@ function LexemeEntry({
       <tr className={'border-t ' + (isEven ? 'bg-zinc-900' : 'bg-zinc-950')}>
         <td rowSpan={lexemeRowSpan} className="py-2 font-mono">
           {lexeme.term}
-          {isEven ? 'Even' : 'Odd'}
         </td>
         {firstSense ? (
           <>
