@@ -348,7 +348,13 @@ function LexemeEditCard({
  * of fake placeholder values. Editing swaps the whole group for one full-width
  * row holding the edit card.
  */
-function LexemeEntry({ lexeme }: { lexeme: CompleteLexeme }) {
+function LexemeEntry({
+  lexeme,
+  isEven,
+}: {
+  lexeme: CompleteLexeme;
+  isEven: boolean;
+}) {
   const [isEditing, setIsEditing] = useState(false);
 
   const [deleteState, deleteAction, deletePending] = useActionState(
@@ -374,9 +380,10 @@ function LexemeEntry({ lexeme }: { lexeme: CompleteLexeme }) {
 
   return (
     <>
-      <tr className="border-t">
+      <tr className={'border-t ' + (isEven ? 'bg-zinc-900' : 'bg-zinc-950')}>
         <td rowSpan={lexemeRowSpan} className="py-2 font-mono">
           {lexeme.term}
+          {isEven ? 'Even' : 'Odd'}
         </td>
         {firstSense ? (
           <>
@@ -448,32 +455,32 @@ export default function DictionaryTable({
     );
 
   return (
-    <table className="w-full border">
+    <table className="w-full border table-fixed wrap-break-word">
       <thead>
         <tr>
-          <th scope="col" className="py-1">
+          <th scope="col" className="py-1 w-[14%]">
             Term
           </th>
-          <th scope="col" className="py-1">
+          <th scope="col" className="py-1 w-[12%]">
             Part of Speech
           </th>
           <th scope="col" className="py-1">
             Definition
           </th>
-          <th scope="col" className="py-1">
+          <th scope="col" className="py-1 w-[16%]">
             Notes
           </th>
-          <th scope="col" className="py-1">
+          <th scope="col" className="py-1 w-[12%]">
             Tags
           </th>
-          <th scope="col" className="py-1">
+          <th scope="col" className="py-1 w-56">
             Actions
           </th>
         </tr>
       </thead>
       <tbody className="text-center">
-        {dictionary.map((lexeme) => (
-          <LexemeEntry lexeme={lexeme} key={lexeme.id} />
+        {dictionary.map((lexeme, i) => (
+          <LexemeEntry lexeme={lexeme} key={lexeme.id} isEven={i % 2 === 0} />
         ))}
       </tbody>
     </table>
