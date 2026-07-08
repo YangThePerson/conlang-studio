@@ -1,8 +1,14 @@
 'use client';
 
 import { lexemes, senses, tags } from '@/app/db/schema';
-import { useState, useTransition } from 'react';
-import { addSenseToLexeme } from './actions';
+import { useActionState, useState } from 'react';
+import {
+  addSenseToLexeme,
+  deleteLexeme,
+  deleteSense,
+  updateLexeme,
+  updateSense,
+} from './actions';
 
 type Lexeme = typeof lexemes.$inferSelect;
 type Sense = typeof senses.$inferSelect;
@@ -14,82 +20,401 @@ type CompleteLexeme = Lexeme & {
 };
 
 /**
- * One dictionary entry rendered as a group of table rows: the lexeme's term, notes,
- * and tags span all of its sense rows via `rowSpan`, each sense contributes a
- * part-of-speech/definition row, and a trailing full-width row holds the Add Sense
- * button. Rendered as sibling `<tr>`s (not a nested table) so the sense columns stay
- * aligned with the shared header.
+ * The slice of an action `Result` the UI needs to render failures. Typed
+ * structurally so this client file doesn't import from `app/lib/*`.
  */
-function LexemeRow({ lexeme }: { lexeme: CompleteLexeme }) {
-  const [pending, startAddSense] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+type ActionState =
+  | { ok: true }
+  | { ok: false; kind: string; issues?: unknown }
+  | null;
 
-  // The first sense shares a row with the rowSpan-ed lexeme cells; the rest get
-  // their own rows. With no senses, the lexeme row keeps empty placeholder cells.
+/**
+ * Extracts the first error message for a field from a validation failure's
+ * `issues` (the `z.treeifyError` output). Defensive because `issues` crosses
+ * the action boundary typed as `unknown`.
+ */
+function fieldError(state: ActionState, field: string): string | undefined {
+  if (!state || state.ok || state.kind !== 'validation') return undefined;
+  if (typeof state.issues !== 'object' || state.issues === null)
+    return undefined;
+  const { properties } = state.issues as {
+    properties?: Record<string, { errors?: string[] } | undefined>;
+  };
+  return properties?.[field]?.errors?.[0];
+}
+
+/**
+ * User-facing message for non-validation failures. Validation failures return
+ * undefined here — they are rendered as field-level errors via `fieldError`.
+ */
+function failureMessage(state: ActionState): string | undefined {
+  if (!state || state.ok || state.kind === 'validation') return undefined;
+  switch (state.kind) {
+    case 'unauthorized':
+      return 'You must be signed in.';
+    case 'not_found':
+      return 'Not found — it may have been deleted.';
+    default:
+      return 'Something went wrong. Please try again.';
+  }
+}
+
+/**
+ * The Add Sense form inside the edit card — the only place senses are created,
+ * so a sense is never born blank. Fields are controlled so they can be cleared
+ * after a successful add (the new sense row appears via revalidation).
+ */
+function AddSenseForm({
+  languageId,
+  lexemeId,
+}: {
+  languageId: string;
+  lexemeId: string;
+}) {
+  const [pos, setPos] = useState('');
+  const [definition, setDefinition] = useState('');
+
+  // Wraps the action rather than binding it so the fields can be cleared on
+  // success right here in the transition — a `useEffect` watching the result
+  // would trip react-hooks/set-state-in-effect.
+  const [state, formAction, pending] = useActionState(
+    async (
+      prev: Awaited<ReturnType<typeof addSenseToLexeme>> | null,
+      formData: FormData,
+    ) => {
+      const result = await addSenseToLexeme(
+        languageId,
+        lexemeId,
+        prev,
+        formData,
+      );
+      if (result.ok) {
+        setPos('');
+        setDefinition('');
+      }
+      return result;
+    },
+    null,
+  );
+
+  const error = failureMessage(state) ?? fieldError(state, 'definition');
+
+  return (
+    <form action={formAction} className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`new-pos-${lexemeId}`} className="text-sm">
+          Part of speech
+        </label>
+        <input
+          id={`new-pos-${lexemeId}`}
+          name="part_of_speech"
+          value={pos}
+          onChange={(e) => setPos(e.target.value)}
+          className="border rounded p-2 w-40"
+        />
+      </div>
+      <div className="flex flex-col gap-1 flex-1 min-w-48">
+        <label htmlFor={`new-definition-${lexemeId}`} className="text-sm">
+          Definition
+        </label>
+        <input
+          id={`new-definition-${lexemeId}`}
+          name="definition"
+          value={definition}
+          onChange={(e) => setDefinition(e.target.value)}
+          className="border rounded p-2"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-32 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+      >
+        {pending ? 'Adding…' : 'Add Sense'}
+      </button>
+      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+    </form>
+  );
+}
+
+/**
+ * One sense inside the edit card, with inline save and delete. Save and Delete
+ * are sibling forms (forms can't nest) laid out on one line, each bound to its
+ * own action.
+ */
+function SenseEditRow({
+  languageId,
+  sense,
+}: {
+  languageId: string;
+  sense: Sense;
+}) {
+  const [pos, setPos] = useState(sense.part_of_speech);
+  const [definition, setDefinition] = useState(sense.definition);
+
+  const [saveState, saveAction, savePending] = useActionState(
+    updateSense.bind(null, languageId, sense.id),
+    null,
+  );
+  const [deleteState, deleteAction, deletePending] = useActionState(
+    deleteSense.bind(null, languageId, sense.id),
+    null,
+  );
+
+  const error =
+    failureMessage(saveState) ??
+    failureMessage(deleteState) ??
+    fieldError(saveState, 'definition');
+
+  return (
+    <li className="flex flex-wrap items-end gap-3">
+      <form
+        action={saveAction}
+        className="flex flex-wrap items-end gap-3 flex-1"
+      >
+        <div className="flex flex-col gap-1">
+          <label htmlFor={`pos-${sense.id}`} className="text-sm">
+            Part of speech
+          </label>
+          <input
+            id={`pos-${sense.id}`}
+            name="part_of_speech"
+            value={pos}
+            onChange={(e) => setPos(e.target.value)}
+            className="border rounded p-2 w-40"
+          />
+        </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-48">
+          <label htmlFor={`definition-${sense.id}`} className="text-sm">
+            Definition
+          </label>
+          <input
+            id={`definition-${sense.id}`}
+            name="definition"
+            value={definition}
+            onChange={(e) => setDefinition(e.target.value)}
+            className="border rounded p-2"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={savePending || deletePending}
+          className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+        >
+          {savePending ? 'Saving…' : 'Save'}
+        </button>
+      </form>
+      <form action={deleteAction}>
+        <button
+          type="submit"
+          disabled={savePending || deletePending}
+          className="w-24 bg-red-800 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+        >
+          Delete
+        </button>
+      </form>
+      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+    </li>
+  );
+}
+
+/**
+ * Full edit UI for one dictionary entry, shown in place of its view rows: the
+ * lexeme's own fields, each sense with inline save/delete, an Add Sense form,
+ * and entry deletion. Saves are granular — each form commits independently so
+ * every submit maps to a single service call and no multi-table transaction is
+ * needed. Tags are display-only for now; tag editing is a separate feature.
+ */
+function LexemeEditCard({
+  lexeme,
+  close,
+}: {
+  lexeme: CompleteLexeme;
+  close: () => void;
+}) {
+  const [term, setTerm] = useState(lexeme.term);
+  const [notes, setNotes] = useState(lexeme.notes ?? '');
+
+  const [saveState, saveAction, savePending] = useActionState(
+    updateLexeme.bind(null, lexeme.language_id, lexeme.id),
+    null,
+  );
+  const [deleteState, deleteAction, deletePending] = useActionState(
+    deleteLexeme.bind(null, lexeme.language_id, lexeme.id),
+    null,
+  );
+
+  const lexemeError =
+    failureMessage(saveState) ??
+    failureMessage(deleteState) ??
+    fieldError(saveState, 'term');
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Lexeme fields */}
+      <form action={saveAction} className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label htmlFor={`term-${lexeme.id}`} className="text-sm">
+            Term
+          </label>
+          <input
+            id={`term-${lexeme.id}`}
+            name="term"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            className="border rounded p-2 font-mono w-40"
+          />
+        </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-48">
+          <label htmlFor={`notes-${lexeme.id}`} className="text-sm">
+            Notes
+          </label>
+          <input
+            id={`notes-${lexeme.id}`}
+            name="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="border rounded p-2"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={savePending || deletePending}
+          className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+        >
+          {savePending ? 'Saving…' : 'Save'}
+        </button>
+        {lexemeError && (
+          <p className="text-red-500 text-sm w-full">{lexemeError}</p>
+        )}
+      </form>
+
+      {/* Senses */}
+      <div className="flex flex-col gap-2 border-t pt-3">
+        <p className="font-semibold text-sm">Senses</p>
+        {lexeme.senses.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {lexeme.senses.map((sense) => (
+              <SenseEditRow
+                key={sense.id}
+                languageId={lexeme.language_id}
+                sense={sense}
+              />
+            ))}
+          </ul>
+        )}
+        <AddSenseForm languageId={lexeme.language_id} lexemeId={lexeme.id} />
+      </div>
+
+      {/* Entry-level controls */}
+      <div className="flex items-center justify-end gap-2 border-t pt-3">
+        <form action={deleteAction}>
+          <button
+            type="submit"
+            disabled={savePending || deletePending}
+            className="w-32 bg-red-800 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          >
+            Delete Entry
+          </button>
+        </form>
+        <button
+          type="button"
+          onClick={close}
+          className="w-24 bg-gray-600 text-white px-3 py-2 rounded cursor-pointer"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One dictionary entry. In view mode it renders as a group of table rows: the
+ * lexeme's term, notes, and tags span all of its sense rows via `rowSpan`, and
+ * each sense contributes a part-of-speech/definition row — sibling `<tr>`s
+ * (not a nested table) so the sense columns stay aligned with the shared
+ * header. With no senses, a single muted cell spans the sense columns instead
+ * of fake placeholder values. Editing swaps the whole group for one full-width
+ * row holding the edit card.
+ */
+function LexemeEntry({ lexeme }: { lexeme: CompleteLexeme }) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  if (isEditing)
+    return (
+      <tr className="border-t">
+        <td colSpan={6} className="p-4 text-left">
+          <LexemeEditCard lexeme={lexeme} close={() => setIsEditing(false)} />
+        </td>
+      </tr>
+    );
+
+  // The first sense shares a row with the rowSpan-ed lexeme cells; the rest
+  // get their own rows.
   const [firstSense, ...restSenses] = lexeme.senses;
   const lexemeRowSpan = Math.max(lexeme.senses.length, 1);
 
-  const addSense = () => {
-    startAddSense(async () => {
-      const result = await addSenseToLexeme(lexeme.language_id, lexeme.id);
-
-      if (!result.ok) {
-        setError(
-          result.kind === 'not_found'
-            ? 'Language not found.'
-            : result.kind === 'unauthorized'
-              ? 'You must be signed in to add a sense.'
-              : 'Something went wrong. Please try again.',
-        );
-        return;
-      }
-
-      setError(null);
-    });
-  };
-
   return (
     <>
-      <tr>
-        <td rowSpan={lexemeRowSpan} className="py-1 font-mono">
+      <tr className="border-t">
+        <td rowSpan={lexemeRowSpan} className="py-2 font-mono">
           {lexeme.term}
         </td>
-        <td className="py-1">{firstSense?.part_of_speech || '—'}</td>
-        <td className="py-1">{firstSense?.definition || '—'}</td>
-        <td rowSpan={lexemeRowSpan} className="py-1">
+        {firstSense ? (
+          <>
+            <td className="py-2">{firstSense.part_of_speech || '—'}</td>
+            <td className="py-2">{firstSense.definition}</td>
+          </>
+        ) : (
+          <td colSpan={2} className="py-2 text-gray-500 italic">
+            No senses yet
+          </td>
+        )}
+        <td rowSpan={lexemeRowSpan} className="py-2">
           {lexeme.notes || '—'}
         </td>
-        <td rowSpan={lexemeRowSpan} className="py-1">
+        <td rowSpan={lexemeRowSpan} className="py-2">
           {lexeme.tags.map((tag) => tag.name).join(', ') || '—'}
+        </td>
+        <td rowSpan={lexemeRowSpan} className="py-2">
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className="w-24 bg-violet-900 text-white px-3 py-1 rounded cursor-pointer"
+          >
+            Edit
+          </button>
         </td>
       </tr>
       {restSenses.map((sense) => (
         <tr key={sense.id}>
-          <td className="py-1">{sense.part_of_speech || '—'}</td>
-          <td className="py-1">{sense.definition || '—'}</td>
+          <td className="py-2">{sense.part_of_speech || '—'}</td>
+          <td className="py-2">{sense.definition}</td>
         </tr>
       ))}
-      <tr>
-        <td colSpan={5} className="pb-2">
-          <button
-            onClick={addSense}
-            disabled={pending}
-            className="w-full bg-teal-700 text-white rounded disabled:opacity-50 cursor-pointer"
-          >
-            {pending ? 'Adding…' : 'Add Sense'}
-          </button>
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-        </td>
-      </tr>
     </>
   );
 }
 
+/**
+ * Dictionary table: read-only by default, with a per-entry edit mode (matching
+ * the phonemes/syllables pages) that exposes lexeme and sense editing,
+ * sense creation, and entry deletion. Receives server-fetched data as props;
+ * mutations go through Server Actions which revalidate the page on success.
+ */
 export default function DictionaryTable({
   dictionary,
 }: {
   dictionary: CompleteLexeme[];
 }) {
+  if (dictionary.length === 0)
+    return (
+      <p className="text-gray-500">
+        No words yet — bank some from the word generator.
+      </p>
+    );
+
   return (
     <table className="w-full border">
       <thead>
@@ -109,11 +434,14 @@ export default function DictionaryTable({
           <th scope="col" className="py-1">
             Tags
           </th>
+          <th scope="col" className="py-1">
+            Actions
+          </th>
         </tr>
       </thead>
       <tbody className="text-center">
         {dictionary.map((lexeme) => (
-          <LexemeRow lexeme={lexeme} key={lexeme.id} />
+          <LexemeEntry lexeme={lexeme} key={lexeme.id} />
         ))}
       </tbody>
     </table>
