@@ -351,6 +351,13 @@ function LexemeEditCard({
 function LexemeEntry({ lexeme }: { lexeme: CompleteLexeme }) {
   const [isEditing, setIsEditing] = useState(false);
 
+  const [deleteState, deleteAction, deletePending] = useActionState(
+    deleteLexeme.bind(null, lexeme.language_id, lexeme.id),
+    null,
+  );
+
+  const deleteError = failureMessage(deleteState);
+
   if (isEditing)
     return (
       <tr className="border-t">
@@ -388,13 +395,28 @@ function LexemeEntry({ lexeme }: { lexeme: CompleteLexeme }) {
           {lexeme.tags.map((tag) => tag.name).join(', ') || '—'}
         </td>
         <td rowSpan={lexemeRowSpan} className="py-2">
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className="w-24 bg-violet-900 text-white px-3 py-1 rounded cursor-pointer"
-          >
-            Edit
-          </button>
+          <form className="gap-2 flex flex-wrap" action={deleteAction}>
+            <button
+              type="button"
+              disabled={deletePending}
+              onClick={() => setIsEditing(true)}
+              className="w-24 bg-violet-900 text-white px-3 py-1 rounded cursor-pointer"
+            >
+              Edit
+            </button>
+            <button
+              type="submit"
+              disabled={deletePending}
+              className="w-24 bg-red-800 text-white px-3 py-1 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+            >
+              Delete
+            </button>
+            {deleteError && (
+              <p className="text-red-500 text-sm w-full text-left">
+                {deleteError}
+              </p>
+            )}
+          </form>
         </td>
       </tr>
       {restSenses.map((sense) => (
