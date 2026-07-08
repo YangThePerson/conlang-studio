@@ -156,6 +156,16 @@ export const addGeneratedLexemeInputSchema = z.object({
 });
 
 /**
+ * Validates the client-supplied body for manually adding a word into the dictionary.
+ * `language_id` is intentionally absent (comes from the route segment/action argument) and
+ * `origin` is intentionally absent — this operation always sets it to 'manual' server-side.
+ */
+export const createLexemeInputSchema = z.object({
+  term: z.string().min(1),
+  notes: z.string().optional(),
+});
+
+/**
  * Validates the client-supplied fields for updating a lexeme.
  * `origin` is intentionally absent — provenance is set once at creation by the
  * calling service (see `createLexemeSchema`) and editing a word never changes it.

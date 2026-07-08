@@ -3,6 +3,7 @@
 import { lexemes, senses } from '@/app/db/schema';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import {
+  addManualWordSvc,
   addSenseToWordSvc,
   deleteLexemeSvc,
   deleteSenseSvc,
@@ -14,6 +15,23 @@ import { revalidatePath } from 'next/cache';
 
 type Lexeme = typeof lexemes.$inferSelect;
 type Sense = typeof senses.$inferSelect;
+
+export async function createLexeme(
+  languageId: string,
+  _prevState: Result<Lexeme> | null,
+  formData: FormData,
+): Promise<Result<Lexeme>> {
+  const user = await getOrCreateDbUser();
+  if (!user) return { ok: false, kind: 'unauthorized' };
+
+  const result = await addManualWordSvc(user, languageId, {
+    term: formData.get('term'),
+    notes: formData.get('notes') ?? '',
+  });
+
+  if (result.ok) revalidatePath(`/languages/${languageId}/dictionary`);
+  return result;
+}
 
 /**
  * Server Action: adds a sense to a lexeme from the edit card's Add Sense form.

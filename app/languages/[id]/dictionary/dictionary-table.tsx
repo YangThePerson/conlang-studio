@@ -4,6 +4,7 @@ import { lexemes, senses, tags } from '@/app/db/schema';
 import { useActionState, useState } from 'react';
 import {
   addSenseToLexeme,
+  createLexeme,
   deleteLexeme,
   deleteSense,
   updateLexeme,
@@ -57,6 +58,75 @@ function failureMessage(state: ActionState): string | undefined {
     default:
       return 'Something went wrong. Please try again.';
   }
+}
+
+/**
+ * Form for adding a word to the dictionary by hand (origin 'manual', as
+ * opposed to banking from the wordgen). Creates the lexeme only — senses are
+ * added afterwards through the entry's edit card, keeping every submit a
+ * single-table write. Fields are controlled so they can be cleared after a
+ * successful add (the new entry appears via revalidation).
+ */
+function AddLexemeForm({ languageId }: { languageId: string }) {
+  const [term, setTerm] = useState('');
+  const [notes, setNotes] = useState('');
+
+  // Wraps the action rather than binding it so the fields can be cleared on
+  // success right here in the transition — a `useEffect` watching the result
+  // would trip react-hooks/set-state-in-effect.
+  const [state, formAction, pending] = useActionState(
+    async (
+      prev: Awaited<ReturnType<typeof createLexeme>> | null,
+      formData: FormData,
+    ) => {
+      const result = await createLexeme(languageId, prev, formData);
+      if (result.ok) {
+        setTerm('');
+        setNotes('');
+      }
+      return result;
+    },
+    null,
+  );
+
+  const error = failureMessage(state) ?? fieldError(state, 'term');
+
+  return (
+    <form action={formAction} className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-col gap-1">
+        <label htmlFor="new-term" className="text-sm">
+          Term
+        </label>
+        <input
+          id="new-term"
+          name="term"
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          className="border rounded p-2 font-mono w-40"
+        />
+      </div>
+      <div className="flex flex-col gap-1 flex-1 min-w-48">
+        <label htmlFor="new-notes" className="text-sm">
+          Notes
+        </label>
+        <input
+          id="new-notes"
+          name="notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="border rounded p-2"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-32 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+      >
+        {pending ? 'Adding…' : 'Add Word'}
+      </button>
+      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+    </form>
+  );
 }
 
 /**
@@ -441,19 +511,32 @@ function LexemeEntry({
  * the phonemes/syllables pages) that exposes lexeme and sense editing,
  * sense creation, and entry deletion. Receives server-fetched data as props;
  * mutations go through Server Actions which revalidate the page on success.
+ * `languageId` comes from the page rather than the rows so the Add Word form
+ * works when the dictionary is empty.
  */
 export default function DictionaryTable({
+  languageId,
   dictionary,
 }: {
+  languageId: string;
   dictionary: CompleteLexeme[];
 }) {
-  if (dictionary.length === 0)
-    return (
-      <p className="text-gray-500">
-        No words yet — bank some from the word generator.
-      </p>
-    );
+  return (
+    <div className="flex flex-col gap-4">
+      <AddLexemeForm languageId={languageId} />
+      {dictionary.length === 0 ? (
+        <p className="text-gray-500">
+          No words yet — add one above, or bank some from the word generator.
+        </p>
+      ) : (
+        <LexemeTable dictionary={dictionary} />
+      )}
+    </div>
+  );
+}
 
+/** The dictionary rows themselves; rendered only when at least one word exists. */
+function LexemeTable({ dictionary }: { dictionary: CompleteLexeme[] }) {
   return (
     <table className="w-full border table-fixed wrap-break-word">
       <thead>

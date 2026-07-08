@@ -4,6 +4,7 @@ import { db } from '../db';
 import { languages, lexemes, senses, tags, users } from '../db/schema';
 import {
   addGeneratedLexemeInputSchema,
+  createLexemeInputSchema,
   createSenseSchema,
   updateLexemeInputSchema,
   updateSenseInputSchema,
@@ -88,6 +89,39 @@ export async function addGeneratedWordSvc(
       language_id: lang.id,
       term: parsedInput.data.term,
       origin: 'generated',
+    })
+    .returning();
+
+  return { ok: true, data: row };
+}
+
+export async function addManualWordSvc(
+  user: DbUser,
+  rawLanguageId: unknown,
+  rawInput: unknown,
+): Promise<Result<Lexeme>> {
+  const parsedId = uuidSchema.safeParse(rawLanguageId);
+  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+
+  const parsedInput = createLexemeInputSchema.safeParse(rawInput);
+  if (!parsedInput.success)
+    return {
+      ok: false,
+      kind: 'validation',
+      issues: z.treeifyError(parsedInput.error),
+    };
+
+  const lang = await db.query.languages.findFirst({
+    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
+  });
+  if (!lang) return { ok: false, kind: 'not_found' };
+
+  const [row] = await db
+    .insert(lexemes)
+    .values({
+      language_id: lang.id,
+      term: parsedInput.data.term,
+      origin: 'manual',
     })
     .returning();
 

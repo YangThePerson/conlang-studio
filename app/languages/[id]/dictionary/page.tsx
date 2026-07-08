@@ -15,5 +15,5 @@ export default async function DictionaryPage({
   const dictionary = await getDictionarySvc(user, id);
   if (!dictionary.ok) redirect('/languages');
 
-  return <DictionaryTable dictionary={dictionary.data} />;
+  return <DictionaryTable languageId={id} dictionary={dictionary.data} />;
 }
