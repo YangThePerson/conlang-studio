@@ -67,9 +67,11 @@ function failureMessage(state: ActionState): string | undefined {
 function AddSenseForm({
   languageId,
   lexemeId,
+  deleteLexemePending,
 }: {
   languageId: string;
   lexemeId: string;
+  deleteLexemePending: boolean;
 }) {
   const [pos, setPos] = useState('');
   const [definition, setDefinition] = useState('');
@@ -127,7 +129,7 @@ function AddSenseForm({
       </div>
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || deleteLexemePending}
         className="w-32 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
       >
         {pending ? 'Adding…' : 'Add Sense'}
@@ -145,9 +147,11 @@ function AddSenseForm({
 function SenseEditRow({
   languageId,
   sense,
+  deleteLexemePending,
 }: {
   languageId: string;
   sense: Sense;
+  deleteLexemePending: boolean;
 }) {
   const [pos, setPos] = useState(sense.part_of_speech);
   const [definition, setDefinition] = useState(sense.definition);
@@ -198,7 +202,7 @@ function SenseEditRow({
         </div>
         <button
           type="submit"
-          disabled={savePending || deletePending}
+          disabled={savePending || deletePending || deleteLexemePending}
           className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
         >
           {savePending ? 'Saving…' : 'Save'}
@@ -207,7 +211,7 @@ function SenseEditRow({
       <form action={deleteAction}>
         <button
           type="submit"
-          disabled={savePending || deletePending}
+          disabled={savePending || deletePending || deleteLexemePending}
           className="w-24 bg-red-800 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
         >
           Delete
@@ -299,11 +303,16 @@ function LexemeEditCard({
                 key={sense.id}
                 languageId={lexeme.language_id}
                 sense={sense}
+                deleteLexemePending={deletePending}
               />
             ))}
           </ul>
         )}
-        <AddSenseForm languageId={lexeme.language_id} lexemeId={lexeme.id} />
+        <AddSenseForm
+          languageId={lexeme.language_id}
+          lexemeId={lexeme.id}
+          deleteLexemePending={deletePending}
+        />
       </div>
 
       {/* Entry-level controls */}
@@ -320,7 +329,8 @@ function LexemeEditCard({
         <button
           type="button"
           onClick={close}
-          className="w-24 bg-gray-600 text-white px-3 py-2 rounded cursor-pointer"
+          disabled={savePending || deletePending}
+          className="w-24 bg-gray-600 text-white px-3 py-2 rounded cursor-pointer disabled:opacity-50 disabled:cursor-progress"
         >
           Done
         </button>
