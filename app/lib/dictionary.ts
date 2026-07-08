@@ -47,7 +47,7 @@ export async function getDictionarySvc(
 
   return {
     ok: true,
-    data: rows.map(({ tags, ...row }, i) => ({
+    data: rows.map(({ tags, ...row }) => ({
       ...row,
       tags: tags.map(({ tag }) => tag as Tag),
     })),
@@ -94,6 +94,13 @@ export async function addGeneratedWordSvc(
   return { ok: true, data: row };
 }
 
+/**
+ * Adds a sense to a lexeme. Ownership is verified with a single lookup that
+ * requires the lexeme to exist, to belong to the given language, and the
+ * language to be owned by `user` — a lexeme id from another user's language
+ * (or a language/lexeme mismatch) comes back as `not_found`, never confirming
+ * that the row exists.
+ */
 export async function addSenseToWordSvc(
   user: DbUser,
   rawLanguageId: unknown,
@@ -110,16 +117,14 @@ export async function addSenseToWordSvc(
       issues: z.treeifyError(parsedInput.error),
     };
 
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-    with: {
-      lexemes: true,
-    },
+  const lexeme = await db.query.lexemes.findFirst({
+    where: and(
+      eq(lexemes.id, parsedInput.data.lexeme_id),
+      eq(lexemes.language_id, parsedId.data),
+      inArray(lexemes.language_id, ownedLanguageIds(user)),
+    ),
   });
-  if (!lang) return { ok: false, kind: 'not_found' };
-
-  if (!lang.lexemes.find(({ id }) => id === parsedInput.data.lexeme_id))
-    return { ok: false, kind: 'unauthorized' };
+  if (!lexeme) return { ok: false, kind: 'not_found' };
 
   const [row] = await db.insert(senses).values(parsedInput.data).returning();
 
@@ -149,12 +154,17 @@ function ownedLexemeIds(user: DbUser) {
     .where(inArray(lexemes.language_id, ownedLanguageIds(user)));
 }
 
+/**
+ * Updates a lexeme's term and notes, enforcing ownership via the
+ * owned-languages subquery inside the UPDATE's WHERE. `origin` is deliberately
+ * not updatable — see `updateLexemeInputSchema`.
+ */
 export async function updateLexemeSvc(
   user: DbUser,
-  rawLanguageId: unknown,
+  rawLexemeId: unknown,
   rawInput: unknown,
 ): Promise<Result<Lexeme>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
+  const parsedId = uuidSchema.safeParse(rawLexemeId);
   if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
 
   const parsedInput = updateLexemeInputSchema.safeParse(rawInput);
@@ -180,6 +190,10 @@ export async function updateLexemeSvc(
   return { ok: true, data: updated };
 }
 
+/**
+ * Deletes a lexeme, with the same ownership enforcement as `updateLexemeSvc`.
+ * Its senses and tag attachments go with it via `onDelete: 'cascade'`.
+ */
 export async function deleteLexemeSvc(
   user: DbUser,
   rawId: unknown,
