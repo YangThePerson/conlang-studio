@@ -450,7 +450,7 @@ function LexemeEntry({
 
   return (
     <>
-      <tr className={'border-t ' + (isEven ? 'bg-zinc-900' : 'bg-zinc-950')}>
+      <tr className={'border-t ' + (isEven ? 'bg-zinc-900' : 'bg-zinc-800')}>
         <td rowSpan={lexemeRowSpan} className="py-2 font-mono">
           {lexeme.term}
         </td>
@@ -496,7 +496,7 @@ function LexemeEntry({
         </td>
       </tr>
       {restSenses.map((sense) => (
-        <tr key={sense.id}>
+        <tr key={sense.id} className={isEven ? 'bg-zinc-900' : 'bg-zinc-800'}>
           <td className="py-2">{sense.part_of_speech || '—'}</td>
           <td className="py-2">{sense.definition}</td>
         </tr>
