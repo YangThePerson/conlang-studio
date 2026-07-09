@@ -1,15 +1,15 @@
-import { z } from 'zod';
 import {
-  languages,
   phoneme_groups,
   phonemes,
   syllable_structures,
   users,
 } from '../db/schema';
-import { generateWordsInputSchema, uuidSchema } from '../db/validation';
+import { generateWordsInputSchema } from '../db/validation';
 import { db } from '../db';
 import { and, eq, inArray } from 'drizzle-orm';
-import { Result } from './result';
+import { notFound, validationMessage, type Result } from './result';
+import { parseInput } from './parse';
+import { parseAndRequireOwnedLanguage } from './ownership';
 
 type DbUser = typeof users.$inferSelect;
 export type Rng = () => number;
@@ -108,7 +108,7 @@ export function generateRandomWord(
 }
 
 export function separateTemplateIds(
-  parsedStructures: SyllableStructure[],
+  parsedStructures: { template: SyllableStructure['template'] }[],
 ): [Set<string>, Set<string>] {
   const phonemeIds = new Set<string>();
   const groupIds = new Set<string>();
@@ -198,44 +198,31 @@ export async function generateWordSvc(
   rawInput: unknown,
   seed?: number,
 ): Promise<Result<{ words: Set<string>; requested: number }>> {
-  const parsedInput = generateWordsInputSchema.safeParse(rawInput);
-  if (!parsedInput.success)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsedInput.error),
-    };
+  const input = parseInput(generateWordsInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const { wordsToGenerate, structures, minSyllables, maxSyllables } =
-    parsedInput.data;
+    input.data;
 
   if (maxSyllables < minSyllables)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues:
-        'The minimum amount of syllables cannot exceed the maximum amount.',
-    };
+    return validationMessage(
+      'The minimum amount of syllables cannot exceed the maximum amount.',
+    );
 
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
   const parsedStructures = await db
     .select()
     .from(syllable_structures)
     .where(
       and(
-        eq(syllable_structures.language_id, parsedId.data),
+        eq(syllable_structures.language_id, lang.data.id),
         inArray(syllable_structures.id, structures),
       ),
     );
 
-  if (!parsedStructures.length) return { ok: false, kind: 'not_found' };
+  if (!parsedStructures.length) return notFound();
 
   const [phonemeIds, groupIds] = separateTemplateIds(parsedStructures);
 
@@ -264,11 +251,9 @@ export async function generateWordSvc(
     (g) => g.memberships.length === 0,
   );
   if (emptyGroup)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: `Phoneme group "${emptyGroup.name}" has no members and cannot be used in word generation.`,
-    };
+    return validationMessage(
+      `Phoneme group "${emptyGroup.name}" has no members and cannot be used in word generation.`,
+    );
 
   const literalTemplates = builtLiteralTemplates(
     phonemesList,

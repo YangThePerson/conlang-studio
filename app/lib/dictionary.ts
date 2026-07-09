@@ -1,16 +1,16 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import { z } from 'zod';
 import { db } from '../db';
-import { languages, lexemes, senses, tags, users } from '../db/schema';
+import { lexemes, senses, tags, users } from '../db/schema';
 import {
   addGeneratedLexemeInputSchema,
   createLexemeInputSchema,
   createSenseSchema,
   updateLexemeInputSchema,
   updateSenseInputSchema,
-  uuidSchema,
 } from '../db/validation';
-import { Result } from './result';
+import { notFound, type Result } from './result';
+import { parseUuid, parseInput } from './parse';
+import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
 
 type Lexeme = typeof lexemes.$inferSelect;
 type Sense = typeof senses.$inferSelect;
@@ -23,6 +23,17 @@ type CompleteLexeme = Lexeme & {
 };
 
 /**
+ * Subquery of lexeme ids reachable through a language owned by `user` — the
+ * lexeme half of the sense → lexeme → language → user ownership chain.
+ */
+function ownedLexemeIds(user: DbUser) {
+  return db
+    .select({ id: lexemes.id })
+    .from(lexemes)
+    .where(inArray(lexemes.language_id, ownedLanguageIds(user)));
+}
+
+/**
  * Returns all lexemes for a language including senses and tags, verifying that the language is owned by `user`.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  */
@@ -30,16 +41,11 @@ export async function getDictionarySvc(
   user: DbUser,
   rawLanguageId: unknown,
 ): Promise<Result<CompleteLexeme[]>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
   const rows = await db.query.lexemes.findMany({
-    where: eq(lexemes.language_id, lang.id),
+    where: eq(lexemes.language_id, lang.data.id),
     with: {
       senses: true,
       tags: { with: { tag: true } },
@@ -67,27 +73,17 @@ export async function addGeneratedWordSvc(
   rawLanguageId: unknown,
   rawInput: unknown,
 ): Promise<Result<Lexeme>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsedInput = addGeneratedLexemeInputSchema.safeParse(rawInput);
-  if (!parsedInput.success)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsedInput.error),
-    };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const input = parseInput(addGeneratedLexemeInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [row] = await db
     .insert(lexemes)
     .values({
-      language_id: lang.id,
-      term: parsedInput.data.term,
+      language_id: lang.data.id,
+      term: input.data.term,
       origin: 'generated',
     })
     .returning();
@@ -100,28 +96,18 @@ export async function addManualWordSvc(
   rawLanguageId: unknown,
   rawInput: unknown,
 ): Promise<Result<Lexeme>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsedInput = createLexemeInputSchema.safeParse(rawInput);
-  if (!parsedInput.success)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsedInput.error),
-    };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const input = parseInput(createLexemeInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [row] = await db
     .insert(lexemes)
     .values({
-      language_id: lang.id,
-      term: parsedInput.data.term,
-      notes: parsedInput.data.notes,
+      language_id: lang.data.id,
+      term: input.data.term,
+      notes: input.data.notes,
       origin: 'manual',
     })
     .returning();
@@ -141,52 +127,24 @@ export async function addSenseToWordSvc(
   rawLanguageId: unknown,
   rawInput: unknown,
 ): Promise<Result<Sense>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawLanguageId);
+  if (!id.ok) return id;
 
-  const parsedInput = createSenseSchema.safeParse(rawInput);
-  if (!parsedInput.success)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsedInput.error),
-    };
+  const input = parseInput(createSenseSchema, rawInput);
+  if (!input.ok) return input;
 
   const lexeme = await db.query.lexemes.findFirst({
     where: and(
-      eq(lexemes.id, parsedInput.data.lexeme_id),
-      eq(lexemes.language_id, parsedId.data),
+      eq(lexemes.id, input.data.lexeme_id),
+      eq(lexemes.language_id, id.data),
       inArray(lexemes.language_id, ownedLanguageIds(user)),
     ),
   });
-  if (!lexeme) return { ok: false, kind: 'not_found' };
+  if (!lexeme) return notFound();
 
-  const [row] = await db.insert(senses).values(parsedInput.data).returning();
+  const [row] = await db.insert(senses).values(input.data).returning();
 
   return { ok: true, data: row };
-}
-
-/**
- * Subquery of language ids owned by `user`. Not awaited on its own — composed
- * into a WHERE via `inArray` so ownership enforcement stays inside the single
- * UPDATE/DELETE statement rather than a separate read.
- */
-function ownedLanguageIds(user: DbUser) {
-  return db
-    .select({ id: languages.id })
-    .from(languages)
-    .where(eq(languages.user_id, user.id));
-}
-
-/**
- * Subquery of lexeme ids reachable through a language owned by `user` — the
- * lexeme half of the sense → lexeme → language → user ownership chain.
- */
-function ownedLexemeIds(user: DbUser) {
-  return db
-    .select({ id: lexemes.id })
-    .from(lexemes)
-    .where(inArray(lexemes.language_id, ownedLanguageIds(user)));
 }
 
 /**
@@ -199,29 +157,24 @@ export async function updateLexemeSvc(
   rawLexemeId: unknown,
   rawInput: unknown,
 ): Promise<Result<Lexeme>> {
-  const parsedId = uuidSchema.safeParse(rawLexemeId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawLexemeId);
+  if (!id.ok) return id;
 
-  const parsedInput = updateLexemeInputSchema.safeParse(rawInput);
-  if (!parsedInput.success)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsedInput.error),
-    };
+  const input = parseInput(updateLexemeInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [updated] = await db
     .update(lexemes)
-    .set(parsedInput.data)
+    .set(input.data)
     .where(
       and(
-        eq(lexemes.id, parsedId.data),
+        eq(lexemes.id, id.data),
         inArray(lexemes.language_id, ownedLanguageIds(user)),
       ),
     )
     .returning();
 
-  if (!updated) return { ok: false, kind: 'not_found' };
+  if (!updated) return notFound();
   return { ok: true, data: updated };
 }
 
@@ -233,20 +186,20 @@ export async function deleteLexemeSvc(
   user: DbUser,
   rawId: unknown,
 ): Promise<Result<Lexeme>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
   const [deleted] = await db
     .delete(lexemes)
     .where(
       and(
-        eq(lexemes.id, parsedId.data),
+        eq(lexemes.id, id.data),
         inArray(lexemes.language_id, ownedLanguageIds(user)),
       ),
     )
     .returning();
 
-  if (!deleted) return { ok: false, kind: 'not_found' };
+  if (!deleted) return notFound();
   return { ok: true, data: deleted };
 }
 
@@ -261,29 +214,24 @@ export async function updateSenseSvc(
   rawSenseId: unknown,
   rawInput: unknown,
 ): Promise<Result<Sense>> {
-  const parsedId = uuidSchema.safeParse(rawSenseId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawSenseId);
+  if (!id.ok) return id;
 
-  const parsedInput = updateSenseInputSchema.safeParse(rawInput);
-  if (!parsedInput.success)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsedInput.error),
-    };
+  const input = parseInput(updateSenseInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [updated] = await db
     .update(senses)
-    .set(parsedInput.data)
+    .set(input.data)
     .where(
       and(
-        eq(senses.id, parsedId.data),
+        eq(senses.id, id.data),
         inArray(senses.lexeme_id, ownedLexemeIds(user)),
       ),
     )
     .returning();
 
-  if (!updated) return { ok: false, kind: 'not_found' };
+  if (!updated) return notFound();
   return { ok: true, data: updated };
 }
 
@@ -296,19 +244,19 @@ export async function deleteSenseSvc(
   user: DbUser,
   rawSenseId: unknown,
 ): Promise<Result<Sense>> {
-  const parsedId = uuidSchema.safeParse(rawSenseId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawSenseId);
+  if (!id.ok) return id;
 
   const [deleted] = await db
     .delete(senses)
     .where(
       and(
-        eq(senses.id, parsedId.data),
+        eq(senses.id, id.data),
         inArray(senses.lexeme_id, ownedLexemeIds(user)),
       ),
     )
     .returning();
 
-  if (!deleted) return { ok: false, kind: 'not_found' };
+  if (!deleted) return notFound();
   return { ok: true, data: deleted };
 }

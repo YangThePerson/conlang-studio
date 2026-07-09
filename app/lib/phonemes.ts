@@ -1,13 +1,11 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
-import { z } from 'zod';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/app/db';
-import { phonemes, languages, users } from '@/app/db/schema';
-import {
-  createPhonemeInputSchema,
-  updatePhonemeInputSchema,
-  uuidSchema,
-} from '@/app/db/validation';
-import type { Result } from './result';
+import { phonemes, users } from '@/app/db/schema';
+import { createPhonemeInputSchema, updatePhonemeInputSchema } from '@/app/db/validation';
+import { conflict, notFound, type Result } from './result';
+import { parseUuid, parseInput } from './parse';
+import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
+import { isReferencedInSyllableTemplates } from './syllables';
 
 type Phoneme = typeof phonemes.$inferSelect;
 type DbUser = typeof users.$inferSelect;
@@ -20,18 +18,13 @@ export async function listPhonemesSvc(
   user: DbUser,
   rawLanguageId: unknown,
 ): Promise<Result<Phoneme[]>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
   const rows = await db
     .select()
     .from(phonemes)
-    .where(eq(phonemes.language_id, parsedId.data));
+    .where(eq(phonemes.language_id, lang.data.id));
 
   return { ok: true, data: rows };
 }
@@ -46,30 +39,19 @@ export async function createPhonemeSvc(
   rawLanguageId: unknown,
   rawInput: unknown,
 ): Promise<Result<Phoneme>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsed = createPhonemeInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const input = parseInput(createPhonemeInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [created] = await db
     .insert(phonemes)
     .values({
-      language_id: parsedId.data,
-      symbol: parsed.data.symbol,
-      ipa: parsed.data.ipa,
-      weight: parsed.data.weight ?? 1.0,
+      language_id: lang.data.id,
+      symbol: input.data.symbol,
+      ipa: input.data.ipa,
+      weight: input.data.weight ?? 1.0,
     })
     .returning();
 
@@ -86,35 +68,24 @@ export async function updatePhonemeSvc(
   rawId: unknown,
   rawInput: unknown,
 ): Promise<Result<Phoneme>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
-  const parsed = updatePhonemeInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
-
-  const ownedLanguageIds = db
-    .select({ id: languages.id })
-    .from(languages)
-    .where(eq(languages.user_id, user.id));
+  const input = parseInput(updatePhonemeInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [updated] = await db
     .update(phonemes)
-    .set(parsed.data)
+    .set(input.data)
     .where(
       and(
-        eq(phonemes.id, parsedId.data),
-        inArray(phonemes.language_id, ownedLanguageIds),
+        eq(phonemes.id, id.data),
+        inArray(phonemes.language_id, ownedLanguageIds(user)),
       ),
     )
     .returning();
 
-  if (!updated) return { ok: false, kind: 'not_found' };
+  if (!updated) return notFound();
   return { ok: true, data: updated };
 }
 
@@ -128,41 +99,33 @@ export async function deletePhonemeSvc(
   user: DbUser,
   rawId: unknown,
 ): Promise<Result<Phoneme>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const ownedLanguageIds = db
-    .select({ id: languages.id })
-    .from(languages)
-    .where(eq(languages.user_id, user.id));
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
   const [phoneme] = await db
     .select()
     .from(phonemes)
     .where(
       and(
-        eq(phonemes.id, parsedId.data),
-        inArray(phonemes.language_id, ownedLanguageIds),
+        eq(phonemes.id, id.data),
+        inArray(phonemes.language_id, ownedLanguageIds(user)),
       ),
     )
     .limit(1);
-  if (!phoneme) return { ok: false, kind: 'not_found' };
+  if (!phoneme) return notFound();
 
-  const { rows } = await db.execute(
-    sql`SELECT EXISTS (
-      SELECT 1
-      FROM syllable_structures, jsonb_array_elements(template) AS slot
-      WHERE syllable_structures.language_id = ${phoneme.language_id}
-      AND slot->>'phonemeId' = ${phoneme.id}
-    ) AS referenced`,
+  const referenced = await isReferencedInSyllableTemplates(
+    phoneme.language_id,
+    'phonemeId',
+    phoneme.id,
   );
-  if (rows[0].referenced) return { ok: false, kind: 'conflict' };
+  if (referenced) return conflict();
 
   const [deleted] = await db
     .delete(phonemes)
-    .where(eq(phonemes.id, parsedId.data))
+    .where(eq(phonemes.id, id.data))
     .returning();
 
-  if (!deleted) return { ok: false, kind: 'not_found' };
+  if (!deleted) return notFound();
   return { ok: true, data: deleted };
 }

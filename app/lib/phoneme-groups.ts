@@ -1,8 +1,7 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/app/db';
 import {
   group_memberships,
-  languages,
   phoneme_groups,
   phonemes,
   users,
@@ -11,10 +10,15 @@ import {
   createGroupMembershipSchema,
   createPhonemeGroupInputSchema,
   updatePhonemeGroupInputSchema,
-  uuidSchema,
 } from '@/app/db/validation';
-import type { Result } from './result';
-import { z } from 'zod';
+import { conflict, notFound, validationMessage, type Result } from './result';
+import { parseUuid, parseInput } from './parse';
+import {
+  isUniqueViolation,
+  ownedLanguageIds,
+  parseAndRequireOwnedLanguage,
+} from './ownership';
+import { isReferencedInSyllableTemplates } from './syllables';
 
 type Phoneme = typeof phonemes.$inferSelect;
 type PhonemeGroup = typeof phoneme_groups.$inferSelect;
@@ -27,6 +31,19 @@ export type PhonemeGroupWithMembers = {
   members: Phoneme[];
 };
 
+/** `{ ok: false, kind: 'validation' }` for the one field a phoneme group's name can collide on. */
+function duplicateGroupNameResult() {
+  return validationMessage({
+    properties: {
+      name: {
+        errors: [
+          'A phoneme group with this name already exists for this language.',
+        ],
+      },
+    },
+  });
+}
+
 /**
  * Returns all phoneme groups for a language with their member phonemes, verifying that
  * the language is owned by `user`. Uses a single relational query rather than separate
@@ -37,16 +54,11 @@ export async function listPhonemeGroupsWithMembersSvc(
   user: DbUser,
   rawLanguageId: unknown,
 ): Promise<Result<PhonemeGroupWithMembers[]>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
   const rows = await db.query.phoneme_groups.findMany({
-    where: eq(phoneme_groups.language_id, parsedId.data),
+    where: eq(phoneme_groups.language_id, lang.data.id),
     with: {
       memberships: {
         with: { phoneme: true },
@@ -74,24 +86,16 @@ export async function getPhonemeMembersInGroupSvc(
   rawLanguageId: unknown,
   rawGroupId: unknown,
 ): Promise<Result<Phoneme[]>> {
-  const parsedLangId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedLangId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsedGroupId = uuidSchema.safeParse(rawGroupId);
-  if (!parsedGroupId.success) return { ok: false, kind: 'invalid_id' };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(
-      eq(languages.id, parsedLangId.data),
-      eq(languages.user_id, user.id),
-    ),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const groupId = parseUuid(rawGroupId);
+  if (!groupId.ok) return groupId;
 
   const group = await db.query.phoneme_groups.findFirst({
     where: and(
-      eq(phoneme_groups.id, parsedGroupId.data),
-      eq(phoneme_groups.language_id, parsedLangId.data),
+      eq(phoneme_groups.id, groupId.data),
+      eq(phoneme_groups.language_id, lang.data.id),
     ),
     with: {
       memberships: {
@@ -100,7 +104,7 @@ export async function getPhonemeMembersInGroupSvc(
     },
   });
 
-  if (!group) return { ok: false, kind: 'not_found' };
+  if (!group) return notFound();
 
   return {
     ok: true,
@@ -119,57 +123,24 @@ export async function createPhonemeGroupSvc(
   rawLanguageId: unknown,
   rawInput: unknown,
 ): Promise<Result<PhonemeGroup>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsed = createPhonemeGroupInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const input = parseInput(createPhonemeGroupInputSchema, rawInput);
+  if (!input.ok) return input;
 
   try {
     const [created] = await db
       .insert(phoneme_groups)
       .values({
-        language_id: parsedId.data,
-        name: parsed.data.name,
+        language_id: lang.data.id,
+        name: input.data.name,
       })
       .returning();
 
     return { ok: true, data: created };
   } catch (error: unknown) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      // Postgres unique constraint violation code
-      error.code === '23505'
-    ) {
-      return {
-        ok: false,
-        kind: 'validation',
-        issues: {
-          properties: {
-            name: {
-              errors: [
-                'A phoneme group with this name already exists for this language.',
-              ],
-            },
-          },
-        },
-      };
-    }
-
-    // Re-throw if it's an unexpected database error
+    if (isUniqueViolation(error)) return duplicateGroupNameResult();
     throw error;
   }
 }
@@ -185,61 +156,28 @@ export async function updatePhonemeGroupSvc(
   rawId: unknown,
   rawInput: unknown,
 ): Promise<Result<PhonemeGroup>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
-  const parsed = updatePhonemeGroupInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
-
-  const ownedLanguageIds = db
-    .select({ id: languages.id })
-    .from(languages)
-    .where(eq(languages.user_id, user.id));
+  const input = parseInput(updatePhonemeGroupInputSchema, rawInput);
+  if (!input.ok) return input;
 
   try {
     const [updated] = await db
       .update(phoneme_groups)
-      .set(parsed.data)
+      .set(input.data)
       .where(
         and(
-          eq(phoneme_groups.id, parsedId.data),
-          inArray(phoneme_groups.language_id, ownedLanguageIds),
+          eq(phoneme_groups.id, id.data),
+          inArray(phoneme_groups.language_id, ownedLanguageIds(user)),
         ),
       )
       .returning();
 
-    if (!updated) return { ok: false, kind: 'not_found' };
+    if (!updated) return notFound();
     return { ok: true, data: updated };
   } catch (error: unknown) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      // Postgres unique constraint violation code
-      error.code === '23505'
-    ) {
-      return {
-        ok: false,
-        kind: 'validation',
-        issues: {
-          properties: {
-            name: {
-              errors: [
-                'A phoneme group with this name already exists for this language.',
-              ],
-            },
-          },
-        },
-      };
-    }
-
-    // Re-throw if it's an unexpected database error
+    if (isUniqueViolation(error)) return duplicateGroupNameResult();
     throw error;
   }
 }
@@ -257,65 +195,43 @@ export async function addPhonemeToGroupSvc(
   rawPhonemeId: unknown,
   rawGroupId: unknown,
 ): Promise<Result<PhonemeGroupMembership>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsed = createGroupMembershipSchema.safeParse({
+  const input = parseInput(createGroupMembershipSchema, {
     group_id: rawGroupId,
     phoneme_id: rawPhonemeId,
   });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  if (!input.ok) return input;
 
   const [phoneme, group] = await Promise.all([
     db.query.phonemes.findFirst({
       where: and(
-        eq(phonemes.id, parsed.data.phoneme_id),
-        eq(phonemes.language_id, parsedId.data),
+        eq(phonemes.id, input.data.phoneme_id),
+        eq(phonemes.language_id, lang.data.id),
       ),
     }),
     db.query.phoneme_groups.findFirst({
       where: and(
-        eq(phoneme_groups.id, parsed.data.group_id),
-        eq(phoneme_groups.language_id, parsedId.data),
+        eq(phoneme_groups.id, input.data.group_id),
+        eq(phoneme_groups.language_id, lang.data.id),
       ),
     }),
   ]);
-  if (!phoneme || !group) return { ok: false, kind: 'not_found' };
+  if (!phoneme || !group) return notFound();
 
   try {
     const [created] = await db
       .insert(group_memberships)
-      .values(parsed.data)
+      .values(input.data)
       .returning();
 
     return { ok: true, data: created };
   } catch (error: unknown) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      // Postgres unique constraint violation code
-      error.code === '23505'
-    ) {
-      return {
-        ok: false,
-        kind: 'validation',
-        issues: { errors: ['This phoneme already belongs to this group.'] },
-      };
-    }
-
-    // Re-throw if it's an unexpected database error
+    if (isUniqueViolation(error))
+      return validationMessage({
+        errors: ['This phoneme already belongs to this group.'],
+      });
     throw error;
   }
 }
@@ -332,53 +248,42 @@ export async function removePhonemeFromGroupSvc(
   rawPhonemeId: unknown,
   rawGroupId: unknown,
 ): Promise<Result<PhonemeGroupMembership>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsed = createGroupMembershipSchema.safeParse({
+  const input = parseInput(createGroupMembershipSchema, {
     group_id: rawGroupId,
     phoneme_id: rawPhonemeId,
   });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  if (!input.ok) return input;
 
   const [phoneme, group] = await Promise.all([
     db.query.phonemes.findFirst({
       where: and(
-        eq(phonemes.id, parsed.data.phoneme_id),
-        eq(phonemes.language_id, parsedId.data),
+        eq(phonemes.id, input.data.phoneme_id),
+        eq(phonemes.language_id, lang.data.id),
       ),
     }),
     db.query.phoneme_groups.findFirst({
       where: and(
-        eq(phoneme_groups.id, parsed.data.group_id),
-        eq(phoneme_groups.language_id, parsedId.data),
+        eq(phoneme_groups.id, input.data.group_id),
+        eq(phoneme_groups.language_id, lang.data.id),
       ),
     }),
   ]);
-  if (!phoneme || !group) return { ok: false, kind: 'not_found' };
+  if (!phoneme || !group) return notFound();
 
   const [deleted] = await db
     .delete(group_memberships)
     .where(
       and(
-        eq(group_memberships.group_id, parsed.data.group_id),
-        eq(group_memberships.phoneme_id, parsed.data.phoneme_id),
+        eq(group_memberships.group_id, input.data.group_id),
+        eq(group_memberships.phoneme_id, input.data.phoneme_id),
       ),
     )
     .returning();
 
-  if (!deleted) return { ok: false, kind: 'not_found' };
+  if (!deleted) return notFound();
   return { ok: true, data: deleted };
 }
 
@@ -392,41 +297,33 @@ export async function deletePhonemeGroupSvc(
   user: DbUser,
   rawId: unknown,
 ): Promise<Result<PhonemeGroup>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const ownedLanguageIds = db
-    .select({ id: languages.id })
-    .from(languages)
-    .where(eq(languages.user_id, user.id));
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
   const [group] = await db
     .select()
     .from(phoneme_groups)
     .where(
       and(
-        eq(phoneme_groups.id, parsedId.data),
-        inArray(phoneme_groups.language_id, ownedLanguageIds),
+        eq(phoneme_groups.id, id.data),
+        inArray(phoneme_groups.language_id, ownedLanguageIds(user)),
       ),
     )
     .limit(1);
-  if (!group) return { ok: false, kind: 'not_found' };
+  if (!group) return notFound();
 
-  const { rows } = await db.execute(
-    sql`SELECT EXISTS (
-      SELECT 1
-      FROM syllable_structures, jsonb_array_elements(template) AS slot
-      WHERE syllable_structures.language_id = ${group.language_id}
-      AND slot->>'groupId' = ${group.id}
-    ) AS referenced`,
+  const referenced = await isReferencedInSyllableTemplates(
+    group.language_id,
+    'groupId',
+    group.id,
   );
-  if (rows[0].referenced) return { ok: false, kind: 'conflict' };
+  if (referenced) return conflict();
 
   const [deleted] = await db
     .delete(phoneme_groups)
-    .where(eq(phoneme_groups.id, parsedId.data))
+    .where(eq(phoneme_groups.id, id.data))
     .returning();
 
-  if (!deleted) return { ok: false, kind: 'not_found' };
+  if (!deleted) return notFound();
   return { ok: true, data: deleted };
 }

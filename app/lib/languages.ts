@@ -1,13 +1,9 @@
 import { and, eq } from 'drizzle-orm';
-import { z } from 'zod';
 import { db } from '@/app/db';
 import { languages, users } from '@/app/db/schema';
-import {
-  createLanguageInputSchema,
-  updateLanguageInputSchema,
-  uuidSchema,
-} from '@/app/db/validation';
-import { Result } from './result';
+import { createLanguageInputSchema, updateLanguageInputSchema } from '@/app/db/validation';
+import { notFound, type Result } from './result';
+import { parseUuid, parseInput } from './parse';
 
 type Language = typeof languages.$inferSelect;
 type DbUser = typeof users.$inferSelect;
@@ -27,18 +23,12 @@ export async function createLanguageSvc(
   user: DbUser,
   rawInput: unknown,
 ): Promise<Result<Language>> {
-  const parsed = createLanguageInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
+  const input = parseInput(createLanguageInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [created] = await db
     .insert(languages)
-    .values({ user_id: user.id, name: parsed.data.name })
+    .values({ user_id: user.id, name: input.data.name })
     .returning();
 
   return { ok: true, data: created };
@@ -54,25 +44,19 @@ export async function updateLanguageSvc(
   rawId: unknown,
   rawInput: unknown,
 ): Promise<Result<Language>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
-  const parsed = updateLanguageInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
+  const input = parseInput(updateLanguageInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [updated] = await db
     .update(languages)
-    .set({ name: parsed.data.name })
-    .where(and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)))
+    .set({ name: input.data.name })
+    .where(and(eq(languages.id, id.data), eq(languages.user_id, user.id)))
     .returning();
 
-  if (!updated) return { ok: false, kind: 'not_found' };
+  if (!updated) return notFound();
   return { ok: true, data: updated };
 }
 
@@ -85,14 +69,14 @@ export async function deleteLanguageSvc(
   user: DbUser,
   rawId: unknown,
 ): Promise<Result<Language>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
   const [deleted] = await db
     .delete(languages)
-    .where(and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)))
+    .where(and(eq(languages.id, id.data), eq(languages.user_id, user.id)))
     .returning();
 
-  if (!deleted) return { ok: false, kind: 'not_found' };
+  if (!deleted) return notFound();
   return { ok: true, data: deleted };
 }

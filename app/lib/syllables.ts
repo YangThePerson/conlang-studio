@@ -1,20 +1,15 @@
-import {
-  users,
-  syllable_structures,
-  languages,
-  phonemes,
-  phoneme_groups,
-} from '@/app/db/schema';
-import type { Result } from './result';
+import { users, syllable_structures, phonemes, phoneme_groups } from '@/app/db/schema';
+import { notFound, validationMessage, type Result } from './result';
 import {
   createSyllableStructureInputSchema,
   updateSyllableStructureInputSchema,
-  uuidSchema,
 } from '../db/validation';
 import type { SyllableTemplate } from '../db/json-shapes';
-import { z } from 'zod';
 import { db } from '../db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { parseUuid, parseInput } from './parse';
+import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
+import { separateTemplateIds } from './wordgen';
 
 type DbUser = typeof users.$inferSelect;
 type SyllableStructure = typeof syllable_structures.$inferSelect;
@@ -29,12 +24,7 @@ async function validateTemplateReferences(
   template: SyllableTemplate,
   languageId: string,
 ): Promise<boolean> {
-  const phonemeIds = new Set<string>();
-  const groupIds = new Set<string>();
-  for (const slot of template) {
-    if (slot.kind === 'phoneme') phonemeIds.add(slot.phonemeId);
-    else groupIds.add(slot.groupId);
-  }
+  const [phonemeIds, groupIds] = separateTemplateIds([{ template }]);
 
   const [foundPhonemes, foundGroups] = await Promise.all([
     phonemeIds.size
@@ -68,6 +58,29 @@ async function validateTemplateReferences(
 }
 
 /**
+ * Checks whether any syllable structure template in `languageId` still references
+ * `id` under the given JSONB key (`'phonemeId'` for a phoneme, `'groupId'` for a
+ * phoneme group). Shared by `deletePhonemeSvc` and `deletePhonemeGroupSvc` — both
+ * must block deletion while a template still points at the row, since the
+ * reference lives in JSONB and can't be enforced by a FK constraint.
+ */
+export async function isReferencedInSyllableTemplates(
+  languageId: string,
+  key: 'phonemeId' | 'groupId',
+  id: string,
+): Promise<boolean> {
+  const { rows } = await db.execute(
+    sql`SELECT EXISTS (
+      SELECT 1
+      FROM syllable_structures, jsonb_array_elements(template) AS slot
+      WHERE syllable_structures.language_id = ${languageId}
+      AND slot->>${key} = ${id}
+    ) AS referenced`,
+  );
+  return Boolean(rows[0].referenced);
+}
+
+/**
  * Returns all syllable structures for a language, verifying that the language is owned by `user`.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  */
@@ -75,18 +88,13 @@ export async function listSyllableStructuresSvc(
   user: DbUser,
   rawLanguageId: unknown,
 ): Promise<Result<SyllableStructure[]>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
   const rows = await db
     .select()
     .from(syllable_structures)
-    .where(eq(syllable_structures.language_id, lang.id));
+    .where(eq(syllable_structures.language_id, lang.data.id));
 
   return { ok: true, data: rows };
 }
@@ -103,37 +111,24 @@ export async function createSyllableStructureSvc(
   rawLanguageId: unknown,
   rawInput: unknown,
 ): Promise<Result<SyllableStructure>> {
-  const parsedId = uuidSchema.safeParse(rawLanguageId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-  const parsed = createSyllableStructureInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
+  const input = parseInput(createSyllableStructureInputSchema, rawInput);
+  if (!input.ok) return input;
 
-  const lang = await db.query.languages.findFirst({
-    where: and(eq(languages.id, parsedId.data), eq(languages.user_id, user.id)),
-  });
-  if (!lang) return { ok: false, kind: 'not_found' };
-
-  const valid = await validateTemplateReferences(parsed.data.template, parsedId.data);
+  const valid = await validateTemplateReferences(input.data.template, lang.data.id);
   if (!valid)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: 'One or more phoneme or group IDs in the template do not exist in this language.',
-    };
+    return validationMessage(
+      'One or more phoneme or group IDs in the template do not exist in this language.',
+    );
 
   const [created] = await db
     .insert(syllable_structures)
     .values({
-      language_id: parsedId.data,
-      template: parsed.data.template,
-      weight: parsed.data.weight,
+      language_id: lang.data.id,
+      template: input.data.template,
+      weight: input.data.weight,
     })
     .returning();
 
@@ -152,50 +147,40 @@ export async function updateSyllableStructureSvc(
   rawId: unknown,
   rawInput: unknown,
 ): Promise<Result<SyllableStructure>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
-  const parsed = updateSyllableStructureInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: z.treeifyError(parsed.error),
-    };
-  }
-
-  const ownedLanguageIds = db
-    .select({ id: languages.id })
-    .from(languages)
-    .where(eq(languages.user_id, user.id));
+  const input = parseInput(updateSyllableStructureInputSchema, rawInput);
+  if (!input.ok) return input;
 
   const [existing] = await db
     .select()
     .from(syllable_structures)
     .where(
       and(
-        eq(syllable_structures.id, parsedId.data),
-        inArray(syllable_structures.language_id, ownedLanguageIds),
+        eq(syllable_structures.id, id.data),
+        inArray(syllable_structures.language_id, ownedLanguageIds(user)),
       ),
     )
     .limit(1);
-  if (!existing) return { ok: false, kind: 'not_found' };
+  if (!existing) return notFound();
 
-  const valid = await validateTemplateReferences(parsed.data.template, existing.language_id);
+  const valid = await validateTemplateReferences(
+    input.data.template,
+    existing.language_id,
+  );
   if (!valid)
-    return {
-      ok: false,
-      kind: 'validation',
-      issues: 'One or more phoneme or group IDs in the template do not exist in this language.',
-    };
+    return validationMessage(
+      'One or more phoneme or group IDs in the template do not exist in this language.',
+    );
 
   const [updated] = await db
     .update(syllable_structures)
-    .set(parsed.data)
-    .where(eq(syllable_structures.id, parsedId.data))
+    .set(input.data)
+    .where(eq(syllable_structures.id, id.data))
     .returning();
 
-  if (!updated) return { ok: false, kind: 'not_found' };
+  if (!updated) return notFound();
   return { ok: true, data: updated };
 }
 
@@ -207,24 +192,19 @@ export async function deleteSyllableStructureSvc(
   user: DbUser,
   rawId: unknown,
 ): Promise<Result<SyllableStructure>> {
-  const parsedId = uuidSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, kind: 'invalid_id' };
-
-  const ownedLanguageIds = db
-    .select({ id: languages.id })
-    .from(languages)
-    .where(eq(languages.user_id, user.id));
+  const id = parseUuid(rawId);
+  if (!id.ok) return id;
 
   const [deleted] = await db
     .delete(syllable_structures)
     .where(
       and(
-        eq(syllable_structures.id, parsedId.data),
-        inArray(syllable_structures.language_id, ownedLanguageIds),
+        eq(syllable_structures.id, id.data),
+        inArray(syllable_structures.language_id, ownedLanguageIds(user)),
       ),
     )
     .returning();
 
-  if (!deleted) return { ok: false, kind: 'not_found' };
+  if (!deleted) return notFound();
   return { ok: true, data: deleted };
 }

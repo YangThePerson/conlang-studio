@@ -1,0 +1,67 @@
+import { and, eq } from 'drizzle-orm';
+import { db } from '../db';
+import { languages, users } from '../db/schema';
+import { parseUuid } from './parse';
+import { notFound, type Result } from './result';
+
+type Language = typeof languages.$inferSelect;
+type DbUser = typeof users.$inferSelect;
+
+/**
+ * Subquery of language ids owned by `user`. Not awaited on its own — composed
+ * into a WHERE via `inArray` so ownership enforcement stays inside the single
+ * SELECT/UPDATE/DELETE statement rather than a separate read. Used for tables
+ * that reference `language_id` but carry no direct `user_id` of their own
+ * (phonemes, phoneme_groups, syllable_structures).
+ */
+export function ownedLanguageIds(user: DbUser) {
+  return db
+    .select({ id: languages.id })
+    .from(languages)
+    .where(eq(languages.user_id, user.id));
+}
+
+/**
+ * Fetches a language row, returning `{ ok: false, kind: 'not_found' }` if it
+ * doesn't exist or isn't owned by `user`. Assumes `languageId` is already a
+ * validated UUID — see {@link parseAndRequireOwnedLanguage} for the common
+ * case of validating the raw route/action value first.
+ */
+export async function requireOwnedLanguage(
+  user: DbUser,
+  languageId: string,
+): Promise<Result<Language>> {
+  const lang = await db.query.languages.findFirst({
+    where: and(eq(languages.id, languageId), eq(languages.user_id, user.id)),
+  });
+  if (!lang) return notFound();
+  return { ok: true, data: lang };
+}
+
+/**
+ * Combines {@link parseUuid} and {@link requireOwnedLanguage} — the
+ * preamble repeated at the top of nearly every phoneme/group/syllable/dictionary
+ * service function that receives a `rawLanguageId`.
+ */
+export async function parseAndRequireOwnedLanguage(
+  user: DbUser,
+  rawLanguageId: unknown,
+): Promise<Result<Language>> {
+  const id = parseUuid(rawLanguageId);
+  if (!id.ok) return id;
+  return requireOwnedLanguage(user, id.data);
+}
+
+/**
+ * Structural check for a Postgres unique-constraint violation (`23505`).
+ * Narrower than `instanceof Error` because `pg`/postgres-js errors aren't a
+ * single class hierarchy — duck-typing the `code` field is the stable check.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '23505'
+  );
+}
