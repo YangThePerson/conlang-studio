@@ -1,0 +1,64 @@
+---
+name: verify
+description: Verify a change to this app actually works — static checks, unit tests, then drive the affected flow in the dev server. Use before committing any nontrivial change.
+---
+
+# Verifying a change
+
+Work through the cheapest layer that can catch the problem first, but don't stop before the layer that actually exercises the change.
+
+## 1. Static + unit (always)
+
+```
+npm run lint
+npm run build        # strictest whole-project type check; catches adapter/service signature drift
+npm run test:run     # vitest, single pass — pure domain logic in app/lib/__tests__/
+```
+
+`npm test` is watch mode — never use it from an agent.
+
+## 2. Runtime — dev server
+
+```
+npm run dev
+```
+
+Serves at http://localhost:3000. Requires `.env` with `DATABASE_URL` (Neon dev DB) and Clerk keys. Run it in the background and watch the console — server-side throws and unhandled promise rejections show up there, not in the browser.
+
+### The auth wall
+
+Everything meaningful sits behind Clerk. What you can verify **without** a session:
+
+- Unauthenticated API requests return `401`: `curl -i http://localhost:3000/api/languages`
+- Pages redirect to sign-in rather than erroring.
+
+Full UI verification requires a signed-in browser session. Options, in order of preference:
+
+1. **Ask the user to click through the affected flow** and report what they see — this is a solo-dev project with the owner present.
+2. <!-- TODO(owner): if you create a Clerk dev test account (email + password with the dev-instance test mode), document the credentials source here (e.g. env var names) — never the literal secrets. Until then, option 1 is the way. -->
+
+### Service-layer verification (bypasses the auth wall)
+
+For changes whose interesting behavior is in `app/lib/<feature>.ts`, exercise the service directly with a scratch script — services take an already-resolved user, so no Clerk session is needed:
+
+```ts
+// scratch.ts — run with: npx tsx scratch.ts
+import 'dotenv/config';
+import { db } from './app/db';
+import { users } from './app/db/schema';
+import { createLanguageSvc, deleteLanguageSvc } from './app/lib/languages';
+
+async function main() {
+  const user = (await db.select().from(users).limit(1))[0];
+  const created = await createLanguageSvc(user, { name: 'verify-scratch' });
+  console.log(created);
+  if (created.ok) console.log(await deleteLanguageSvc(user, created.data.id));
+}
+main(); // no top-level await: this package is CJS (no "type": "module")
+```
+
+This runs against the real dev DB — create throwaway rows and delete them in the same script. Keep scratch scripts out of the repo (scratchpad dir, not the project).
+
+## 3. What "verified" means
+
+State what you exercised and what you observed (status codes, rendered output, returned `Result`s). A change to an adapter or page is not verified by unit tests alone — those only cover pure domain logic. If you could not drive the flow (auth wall, no test account), say so explicitly rather than implying it works.
