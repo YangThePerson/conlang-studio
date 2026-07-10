@@ -2,205 +2,154 @@
 
 # Project rules
 
+## Commands
+
+- `npm run dev` — dev server at http://localhost:3000
+- `npm run test:run` — vitest, single pass (`npm test` is watch mode; don't use it from an agent)
+- `npm run lint` — ESLint
+- `npm run build` — production build; also the strictest whole-project type check
+- `npm run db:push` — sync `app/db/schema.ts` to the Neon database. This is the workflow in use (there is no committed migrations directory); `db:generate`/`db:migrate` exist but are not current practice.
+- Requires `DATABASE_URL` (Neon) and Clerk keys in `.env`.
+
 ## Next.js version notes
 
 This project uses **Next.js 16+**. Key breaking changes from earlier versions:
 
-- **Middleware is now called Proxy.** The file is `proxy.ts` at the project root, not `middleware.ts`. The API is otherwise identical. Note: proxy is **not** a security boundary (it can be bypassed); it is for routing/redirects only. Real authorization happens per-handler (see Security requirements).
+- **Middleware is now called Proxy.** The file is `proxy.ts` at the project root, not `middleware.ts`. The API is otherwise identical. Proxy is **not** a security boundary — it is for routing/redirects only; real authorization happens per-handler (see Security requirements).
 - **`params` in dynamic routes is a `Promise`.** Always `await params` before destructuring: `const { id } = await params`.
 - **`PageProps<'/path/[id]'>` and `LayoutProps<'/path'>` are global helpers** — no import needed. Use them for typed page and layout props.
-- **Cache invalidation after mutations.** There are two distinct mechanisms; do not conflate them:
-  - **Server-side cache invalidation** — call `revalidatePath('/path')` or `revalidateTag(tag, 'max')` (from `next/cache`) inside a Server Action after a mutation. These run on the server only. The single-argument `revalidateTag(tag)` form is deprecated — always pass the second argument.
-  - **Client-side router refresh** — call `router.refresh()` from `useRouter()` (`next/navigation`) inside a **client component** when you want the current route re-fetched without changing any cache. This is a client API; it is not exported from `next/cache`.
+- **Cache invalidation after mutations** — two distinct mechanisms; do not conflate them:
+  - Server-side: `revalidatePath('/path')` or `revalidateTag(tag, 'max')` (from `next/cache`) inside a Server Action. The single-argument `revalidateTag(tag)` form is deprecated — always pass the second argument.
+  - Client-side: `router.refresh()` from `useRouter()` (`next/navigation`) in a client component re-fetches the current route. It is a client API, not exported from `next/cache`.
 
 ---
 
 ## Architecture: thin adapters over a shared service layer
 
-The most important rule in this file. Route handlers and Server Actions are **thin entry points**. The real work for each operation lives once, in a feature service module, and both entry points call it. This is what keeps the two paths from drifting and what makes adding a future mobile client cheap.
+The most important rule in this file. Route handlers, Server Actions, and Server Components are **thin entry points**. The real work for each operation lives once, in a feature service module, and every entry point calls it. This keeps parallel paths from drifting and makes a future mobile client cheap.
 
 ### `app/lib/<feature>.ts` — the service layer (single home for an operation)
 
-Each mutating/reading operation is one exported function here, e.g. `createLanguage(user, rawInput)`, `updateLanguage(user, rawInput)`, `deleteLanguage(user, id)`.
+One exported function per operation, named `<verb><Entity>Svc` (`createLanguageSvc`, `deletePhonemeSvc`). A service function receives an **already-resolved DB user** (auth is the adapter's job) and **raw, untrusted input**, validates, enforces ownership, performs the DB operation, and returns a `Result` — never throwing for expected failures. It is **framework-agnostic**: no `revalidatePath`, no `Response.json`, no `auth()`/cookies. That is what lets a browser action, an HTTP route handler, and a future mobile handler reuse it unchanged.
 
-A service function:
+The standard shape, built from the shared helpers — use these, don't hand-roll `safeParse` or ownership checks:
 
-1. Receives an **already-resolved DB user** (auth is the adapter's job — see below) and **raw, untrusted input**.
-2. Runs `safeParse` against the relevant schema from `validation.ts`. (Input validation.)
-3. Enforces ownership in the query itself: `eq(<table>.user_id, user.id)` in every `WHERE`. (Ownership.)
-4. Performs the DB operation.
-5. Returns a typed result — never throws for expected failures. See "Result shape" below.
+```ts
+export async function createThingSvc(
+  user: DbUser,
+  rawLanguageId: unknown,
+  rawInput: unknown,
+): Promise<Result<Thing>> {
+  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  if (!lang.ok) return lang;
 
-A service function is **framework-agnostic**: no `revalidatePath`, no `Response.json`, no reading of `auth()`/cookies. That is precisely what lets a browser action, an HTTP route handler, and a future mobile route handler all reuse it unchanged.
+  const input = parseInput(createThingInputSchema, rawInput);
+  if (!input.ok) return input;
+
+  // ...DB operation scoped to lang.data.id...
+  return { ok: true, data: row };
+}
+```
+
+Helper modules (read their JSDoc before writing a new service function):
+
+- `app/lib/result.ts` — the `Result` type and constructors: `notFound()`, `invalidId()`, `conflict()`, `validationIssues(zodError)`, `validationMessage(issues)` for non-Zod checks (uniqueness conflicts, cross-field rules).
+- `app/lib/parse.ts` — `parseUuid(raw)` for bare ID params; `parseInput(schema, raw)` for body/form input. Both return `Result`-compatible failures for direct early return.
+- `app/lib/ownership.ts` — `parseAndRequireOwnedLanguage(user, rawId)` (the common preamble), `requireOwnedLanguage`, `ownedLanguageIds(user)` (subquery for tables that carry `language_id` but no `user_id`), `isUniqueViolation(err)` (Postgres 23505 duck-type).
 
 ### `app/<feature>/actions.ts` — Server Action adapters
 
-Triggered by client components in this app. An action:
-
-- Resolves auth via `getOrCreateDbUser()` (cookie session).
-- Gathers raw input from its arguments / `FormData` into a plain object.
-- Calls the matching `app/lib/<feature>.ts` function.
-- On success, calls `revalidatePath(...)` for affected paths, then returns the result for `useActionState`.
-- Returns the service's result object to the client; does **not** translate it into thrown errors.
+- Resolve auth via `getOrCreateDbUser()`; if `null`, return `{ ok: false, kind: 'unauthorized' }` without calling the service.
+- Gather raw input from arguments/`FormData` into a plain object; call the service.
+- On success, `revalidatePath(...)` for affected paths; return the `Result` for `useActionState`. Never translate results into thrown errors.
+- `useActionState` compatibility: the signature is `(prevState, formData)`; extra args like `id` go **first** so callers can `.bind(null, id)`.
 
 ### `app/api/.../route.ts` — Route handler adapters
 
-Triggered by any HTTP client (future mobile app, external scripts, curl). A route handler:
+- Same shape: resolve auth (`401` if null), `await params`, parse the body, call the **same** service function the corresponding action uses. Sharing only the schema is not enough — duplicated orchestration drifts.
+- Map the `Result` to HTTP: `ok` → `200`/`201` with the row (or `204` for deletes); `not_found` → `404`; everything else (`validation`, `invalid_id`, `conflict`) → `400` with `{ error: result.kind, issues? }` as the body.
 
-- Resolves auth (today: cookie session via `getOrCreateDbUser()`; **see mobile note below**).
-- Parses the request body / reads route params into a plain object.
-- Calls the same `app/lib/<feature>.ts` function the corresponding action uses.
-- Maps the result to HTTP: `{ ok: true }` → `200`/`201` with the row in `Response.json(...)`; `{ ok: false }` → the appropriate status (`400`/`401`/`404`) with a JSON error body.
-
-> **Mobile-auth caveat:** A mobile client cannot ride Clerk's cookie session — it authenticates with bearer tokens via Clerk's mobile SDK. So `getOrCreateDbUser()` as written (cookie-session resolution) will **not** transfer unchanged to the route handlers a mobile app calls; that path will need a token-based resolver. The _service layer_ is unaffected because it receives an already-resolved user. Until a mobile client is real, the parallel route handlers are kept deliberately, but because the service layer makes adding them trivial, deleting them and re-adding later is a legitimate alternative — decide consciously rather than by default.
+> **Mobile-auth caveat:** a mobile client authenticates with bearer tokens, not Clerk's cookie session, so route handlers will need a token-based resolver when a mobile client becomes real. The service layer is unaffected — it receives an already-resolved user. Until then the parallel route handlers are kept deliberately.
 
 ---
 
 ## Separation of concerns
 
-### `app/db/validation.ts` — single home for all Zod schemas
-
-Every Zod schema lives here. Never define schemas inline inside route handlers, Server Actions, or service functions.
-
-- Input schemas (client-supplied fields only) are named `create<Entity>InputSchema` / `update<Entity>InputSchema`. Prefer the general `update<Entity>InputSchema` over operation-specific names like `rename<Entity>InputSchema` unless the operation is genuinely distinct.
-- Full insert schemas (including server-injected fields like `user_id`) are named `create<Entity>Schema`.
-- `uuidSchema` is the shared validator for bare UUID params — import it wherever an ID must be validated.
-- Document what is intentionally absent from input schemas (e.g. `user_id` is absent because it is injected server-side from the auth session, never supplied by the client).
-
-### `app/db/schema.ts` — Drizzle table definitions only
-
-No business logic here. Types for table rows are derived via `typeof <table>.$inferSelect` and `typeof <table>.$inferInsert` at the use site.
-
-### `app/lib/current-user.ts` — auth boundary
-
-`getOrCreateDbUser` is the canonical way to resolve a Clerk session to a DB user row. Always call it from adapters; never read `auth()` or `currentUser()` directly in routes, actions, or services.
-
-> Note (a real surprise worth its JSDoc): `getOrCreateDbUser` **writes** — it lazily creates the user row on first need. This means an otherwise read-only path that calls it can trigger a row insert. That is the intended provisioning model for now; document it so it isn't mistaken for a pure read.
+- **`app/db/schema.ts`** — Drizzle tables and relations only; no business logic. Conventions: snake_case table/column names, `uuid('id').defaultRandom().primaryKey()`, child tables reference `languages.id` with `onDelete: 'cascade'`, real invariants get DB-level `unique()`/`check()` constraints. Define `relations(...)` for any table read via `db.query.*` relational queries. Row types are derived at the use site via `typeof <table>.$inferSelect` / `$inferInsert`.
+- **`app/db/validation.ts`** — single home for all Zod schemas; never define schemas inline in adapters or services. Input schemas (client-supplied fields only) are `create<Entity>InputSchema` / `update<Entity>InputSchema` — prefer the general update schema over operation-specific names. Full insert schemas (including server-injected fields) are `create<Entity>Schema`. `uuidSchema` validates bare UUID params. Document what is intentionally absent (e.g. `user_id` is injected server-side, never client-supplied).
+- **`app/db/json-shapes.ts`** — Zod schemas and TS types for `jsonb` column payloads (syllable templates, rule contexts) and shared enums (`LEXEME_ORIGINS`). Referenced from `schema.ts` via `.$type<...>()`.
+- **`app/lib/current-user.ts`** — auth boundary. `getOrCreateDbUser()` is the only way adapters resolve a Clerk session to a DB user; never call `auth()`/`currentUser()` elsewhere. Surprise worth knowing: it **writes** — it lazily provisions the user row on first need, so an otherwise read-only path can insert.
 
 ---
 
 ## Result shape (return, don't throw, for expected failures)
 
-Service functions return a discriminated union:
+Defined in `app/lib/result.ts`:
 
 ```ts
 type Result<T> =
   | { ok: true; data: T }
-  | { ok: false; kind: 'validation'; issues: unknown } // issues = z.treeifyError output
-  | { ok: false; kind: 'not_found' }
+  | { ok: false; kind: 'validation'; issues: unknown } // z.treeifyError output, or a hand-written message shape
+  | { ok: false; kind: 'not_found' } // row absent OR present but not owned
   | { ok: false; kind: 'unauthorized' }
-  | { ok: false; kind: 'invalid_id' };
+  | { ok: false; kind: 'invalid_id' }
+  | { ok: false; kind: 'conflict' }; // exists but can't be mutated now (e.g. still referenced by a syllable template)
 ```
 
-Rationale: validation failures, auth failures, and "not found / not owned" are **expected** outcomes, not exceptional ones — the same reasoning behind using `safeParse` over `parse`. Returning them as values lets actions feed them straight into `useActionState` and lets route handlers map them to status codes, with one consistent contract across both entry points. In production, Next.js also redacts thrown error messages sent to the client, so `throw new Error('Invalid input')` would not reliably surface useful detail anyway.
-
-Reserve `throw` for **genuinely unexpected** failures (a violated invariant, an unreachable branch, a DB connection error) and let those bubble to the framework error boundary.
+Expected failures (bad input, not owned, unauthenticated) are **values, not exceptions**: actions feed them straight into `useActionState`, route handlers map them to status codes, and production Next.js redacts thrown error messages anyway. Reserve `throw` for genuinely unexpected failures (violated invariant, DB connection error) and let those bubble to `error.tsx`.
 
 ---
 
 ## Security requirements
 
-Every operation must satisfy all three of the following before touching the database. The table shows where each lives now that logic is centralized:
+Every operation satisfies all three before touching the database:
 
-1. **Authentication** — resolved in the **adapter** (`getOrCreateDbUser()`). If it returns `null`, the adapter returns `401` (route handler) or an `{ ok: false, error: 'Unauthorized' }` result (action); it does not call into the service.
-2. **Input validation** — in the **service** (`safeParse` against the relevant schema from `validation.ts`). Reject invalid input as `{ ok: false }`. Never use raw `FormData.get(...)` or request-body values directly in DB queries.
-3. **Ownership enforcement** — in the **service**, always include `eq(<table>.user_id, user.id)` in the `WHERE` clause of any `UPDATE`, `DELETE`, or owned `SELECT`. A missing ownership check silently allows cross-user data access (IDOR).
+1. **Authentication** — in the **adapter**: `getOrCreateDbUser()`; on `null`, return `401` / unauthorized result and do not call the service.
+2. **Input validation** — in the **service**: `parseInput` with a schema from `validation.ts`; `parseUuid` for bare IDs. Never use raw `FormData.get(...)` or request-body values directly in queries. Bare UUIDs are validated even though ownership would ultimately reject a bad value — a clean, predictable failure beats a DB error.
+3. **Ownership enforcement** — in the **service**, inside the query itself. Two patterns:
+   - `languages` (carries `user_id`): `eq(languages.user_id, user.id)` in every `WHERE`.
+   - Child tables (`phonemes`, `phoneme_groups`, `syllable_structures`, `lexemes`, … — `language_id` only, no `user_id`): verify the language first with `parseAndRequireOwnedLanguage` and scope the query to it, or filter with `inArray(<table>.language_id, ownedLanguageIds(user))` so enforcement stays inside the single statement.
 
-Bare UUID params (route segment `[id]` or an action argument `id: string`) must be validated with `uuidSchema` before use, even though ownership enforcement would ultimately reject a bad value — validation gives a clean, predictable failure rather than a DB error, and a well-formed UUID belonging to another user is still rejected by step 3, not step 2.
-
----
-
-## Route handlers vs. Server Actions
-
-These two mechanisms are parallel entry points, not alternatives. Both are thin adapters over the same service function.
-
-|                              | Route handler (`app/api/.../route.ts`)                    | Server Action (`app/<feature>/actions.ts`)       |
-| ---------------------------- | --------------------------------------------------------- | ------------------------------------------------ |
-| Called by                    | Any HTTP client (future mobile app, scripts, curl)        | Client Components in this app                    |
-| Auth resolution              | Cookie session today; token-based for mobile (see caveat) | `getOrCreateDbUser()` (cookie session)           |
-| Core logic                   | Delegates to `app/lib/<feature>.ts`                       | Delegates to the **same** `app/lib/<feature>.ts` |
-| Input validation + ownership | In the service (shared)                                   | In the service (shared)                          |
-| After success                | Return row in `Response.json(...)` with status            | `revalidatePath(...)`, then return result        |
-| Failure shape                | HTTP status + JSON error body                             | `{ ok: false, ... }` result for `useActionState` |
-
-If a route handler and a Server Action do the same thing, they import the same schema **and call the same service function**. Sharing only the schema is not enough — duplicated orchestration drifts.
+A missing ownership check silently allows cross-user data access (IDOR).
 
 ---
 
 ## Frontend: server-first, service layer is the only data source
 
-The same rule that governs the backend governs the UI: **components are adapters too, not a second home for logic.** A Server Component that reads data and a Server Action that mutates it are both thin entry points over `app/lib/<feature>.ts` — they resolve auth, call the service, and render or return the result. Client Components never touch the database, auth, or the service layer directly; they receive data as props and trigger mutations through actions.
+Components are adapters too, not a second home for logic.
 
-### Default to Server Components; push `'use client'` to the leaves
+- **Default to Server Components; push `'use client'` to the leaves.** Add the directive only for interactivity (state, effects, handlers, browser APIs), as far down the tree as possible. Marking a whole page `'use client'` to fix one button is the frontend version of putting logic in the adapter.
+- **Server-only imports stay on the server.** Client Components must not import `app/lib/*`, `app/db/index.ts`, `app/db/schema.ts`, or call `auth()`/`getOrCreateDbUser()`. Exception by design: `app/db/validation.ts` and `app/db/json-shapes.ts` are shared — client forms import input schemas from there. Client files get data via props from a Server Component or via a Server Action's return value.
+- **Reads: a Server Component is the third adapter.** Resolve the user with `getOrCreateDbUser()`, call a service read function (`listLanguagesSvc(user)`) — never query the DB inline. The `Result` contract applies: `{ ok: false }` renders the empty/error state.
+- **Mutations: client form → `useActionState` → Server Action → service.** Render from the returned `Result`; use `issues` (the `z.treeifyError` shape) to place field-level errors next to the right inputs. Never throw from an action for expected failures.
+- **Client-side validation is UX, not enforcement.** Reuse the same `create<Entity>InputSchema` / `update<Entity>InputSchema` in the form for fast feedback; the service re-validates regardless. One schema, two consumers — never a second hand-rolled set of checks.
+- **Loading and error UI**: `loading.tsx` (or `<Suspense>`) for every route that fetches; `error.tsx` (a Client Component) is the boundary where genuinely-unexpected throws land — expected failures never reach it; `not-found.tsx` for the not-found path.
+- **Styling: Tailwind, locked.** Learn each utility class you use; don't paste an opaque class string you can't read back.
+- **Accessibility baseline**: every input has a `<label>`; every button is a real `<button>`; keyboard operable with visible focus; semantic elements over `<div>` soup; meaningful `alt` text.
 
-- Every component is a Server Component unless it needs interactivity (state, effects, event handlers, browser APIs). Then, and only then, add `'use client'`.
-- Add the directive as far down the tree as possible. A mostly-static page with one interactive widget keeps the page server-rendered and marks only the widget. Marking a whole page `'use client'` to fix one button is the frontend equivalent of putting logic in the adapter — it works, and it quietly costs you.
-- A Client Component must never import from `app/lib/*`, `app/db/*`, or call `auth()` / `getOrCreateDbUser()`. If a client file needs server data, it gets it from a Server Component parent (props) or from a Server Action (return value). This is what keeps secrets and DB access on the server.
+---
 
-### Reading data: a Server Component is the third adapter
+## Testing
 
-Reads have the same shape as the other two entry points. A Server Component that needs owned data resolves the user via `getOrCreateDbUser()` and calls a service read function (`listLanguages(user)`, `getLanguage(user, id)`) — it does **not** query the DB inline. The `Result` contract applies here too: on `{ ok: false }` render the empty/error state; on `{ ok: true }` render `data`.
-
-> Note: this is why data fetching happens on the server by default — the service layer, auth resolution, and the DB connection all live server-side, and a Server Component runs there. Fetching the same data in a Client Component would mean exposing one of those, which the architecture forbids.
-
-### Mutations from the client: `useActionState` → Server Action → service
-
-The form flow is fixed:
-
-1. A Client Component form calls a Server Action via `useActionState`.
-2. The action resolves auth, calls the service, `revalidatePath(...)`, and returns the `Result` (see _Route handlers vs. Server Actions_).
-3. The component renders from that `Result`: show `error` as a message, and use `issues` (the `z.treeifyError` output) to place field-level errors next to the right inputs.
-
-Never throw from an action to signal a validation or ownership failure — the client reads the result as a value, exactly as the result shape intends.
-
-### Validation lives once — reuse the schema on the client
-
-Client-side validation is **UX, not enforcement**: it gives fast feedback before a round-trip. The server stays the source of truth (the service `safeParse`s regardless). So do not write a second, hand-rolled set of client checks — import the same `create<Entity>InputSchema` / `update<Entity>InputSchema` from `app/db/validation.ts` and validate against it in the form. One schema, two consumers. This is how "validation on both sides" is satisfied without two definitions that can drift apart.
-
-### Loading and error UI
-
-- `loading.tsx` (or a `<Suspense>` boundary) for every route that fetches on the server, so a slow query shows a skeleton, not a blank screen.
-- `error.tsx` is a Client Component (`'use client'`) and **is the framework error boundary referenced in the Result shape** — it is where genuinely-unexpected throws land. Expected failures never reach it; they come back as `{ ok: false }`.
-- `not-found.tsx` for the not-found path, consistent with returning 404 when a row is absent or not owned.
-
-### Styling: Tailwind (locked — same spirit as the stack)
-
-Tailwind ships with `create-next-app` by default; switching to anything else now is the switching-cost tax. So it is locked, like the stack.
-
-> The one rule that matters here is the same rule as everywhere else in this project: **learn each utility class you use; do not paste an opaque class string you can't read back.** A wall of `flex items-center gap-2 rounded-md …` copied without understanding is the styling version of committing a line you can't explain. Look the unfamiliar ones up as you go — the vocabulary is small and finite.
-
-### Accessibility baseline (not gold-plating)
-
-This is the difference between "works on my machine" and "a stranger trusts it" — the Phase 2 bar:
-
-- Every input has an associated `<label>`; every button is a real `<button>`.
-- The whole app is operable by keyboard, and focus is always visible.
-- Use semantic elements (`<nav>`, `<main>`, ordered headings) over `<div>` soup.
-- Images carry meaningful `alt` text.
-
-### Not yet, but on the radar (frontend)
-
-Intentionally out of scope now — listed so they aren't forgotten:
-
-- Optimistic UI (`useOptimistic`) for mutations where the round-trip feels slow.
-- A small set of shared UI primitives (button, input, card) — only once duplication starts to hurt.
-- Design tokens / theming — only if the app grows enough surfaces to need consistency enforced.
+Vitest. Unit tests live in `app/lib/__tests__/` and target **pure, framework-free domain logic** (`phonotactics.ts`, `wordgen.ts`). Adapters and DB-touching service functions are not unit-tested — keep new domain logic pure (no DB, no framework imports) so it stays testable this way. Run with `npm run test:run`.
 
 ---
 
 ## Documentation
 
-- All exported functions (route handlers, Server Actions, service functions, helpers, schemas) must have a JSDoc comment.
-- JSDoc should document **what is intentionally absent or non-obvious** — e.g. why `user_id` is not in an input schema, why `getOrCreateDbUser` writes, why an ownership check is structured a certain way.
-- Do not document what the code already says clearly. `// insert the language` above a `db.insert(languages)` call adds no value.
+- Every exported function and schema gets a JSDoc comment.
+- JSDoc documents **what is intentionally absent or non-obvious** — why `user_id` isn't in an input schema, why `getOrCreateDbUser` writes, why an ownership check is structured a certain way. Not what the code already says.
 - Inline comments are for invariants, constraints, and surprises — not narration.
 
 ---
 
 ## Not yet, but on the radar
 
-Intentionally out of scope at the current stage — listed so they aren't forgotten, not so they are done now:
+Intentionally out of scope now — listed so they aren't forgotten, not so they are done now:
 
-- **Rate limiting** on sensitive operations (sign-up, anything expensive) once the app is public-facing.
-- **DB transactions** for any mutation that touches more than one table, so partial writes can't leave inconsistent state.
-- **Token-based auth resolver** for route handlers, added when (and only when) a mobile client becomes real.
+- **Rate limiting** on sensitive operations once the app is public-facing.
+- **DB transactions** for any mutation touching more than one table.
+- **Token-based auth resolver** for route handlers, when a mobile client becomes real.
+- **`conflict` → `409`** in route handlers (currently falls through to `400`); if changed, change it in every handler at once.
+- **Optimistic UI** (`useOptimistic`) where the round-trip feels slow.
+- **Shared UI primitives** (button, input, card) once duplication starts to hurt; design tokens/theming only if surfaces multiply.
