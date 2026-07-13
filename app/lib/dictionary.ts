@@ -1,6 +1,12 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db';
-import { lexemes, senses, tags, users } from '../db/schema';
+import {
+  lexemes,
+  senses,
+  syllable_structures,
+  tags,
+  users,
+} from '../db/schema';
 import {
   addGeneratedLexemeInputSchema,
   createLexemeInputSchema,
@@ -11,6 +17,8 @@ import {
 import { notFound, type Result } from './result';
 import { parseUuid, parseInput } from './parse';
 import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
+import { compilePhonotacticsMatcher } from './phonotactics';
+import { loadLiteralTemplates } from './wordgen';
 
 type Lexeme = typeof lexemes.$inferSelect;
 type Sense = typeof senses.$inferSelect;
@@ -21,6 +29,15 @@ type CompleteLexeme = Lexeme & {
   senses: Sense[];
   tags: Tag[];
 };
+
+/**
+ * A dictionary row plus `fits_phonotactics` — computed at read time against
+ * the language's full syllable-template inventory, NOT a stored column.
+ * `null` means the language has no syllable structures yet, so legality is
+ * undefined (as opposed to `false`, which means the term was checked and
+ * cannot be segmented into legal syllables).
+ */
+type CheckedLexeme = CompleteLexeme & { fits_phonotactics: boolean | null };
 
 /**
  * Subquery of lexeme ids reachable through a language owned by `user` — the
@@ -34,29 +51,43 @@ function ownedLexemeIds(user: DbUser) {
 }
 
 /**
- * Returns all lexemes for a language including senses and tags, verifying that the language is owned by `user`.
+ * Returns all lexemes for a language including senses, tags, and a
+ * `fits_phonotactics` flag (see {@link CheckedLexeme} — legality is checked
+ * against ALL of the language's syllable structures, unlike generation which
+ * uses a user-selected subset), verifying that the language is owned by `user`.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  */
 export async function getDictionarySvc(
   user: DbUser,
   rawLanguageId: unknown,
-): Promise<Result<CompleteLexeme[]>> {
+): Promise<Result<CheckedLexeme[]>> {
   const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
-  const rows = await db.query.lexemes.findMany({
-    where: eq(lexemes.language_id, lang.data.id),
-    with: {
-      senses: true,
-      tags: { with: { tag: true } },
-    },
-  });
+  const [rows, structures] = await Promise.all([
+    db.query.lexemes.findMany({
+      where: eq(lexemes.language_id, lang.data.id),
+      with: {
+        senses: true,
+        tags: { with: { tag: true } },
+      },
+    }),
+    db
+      .select()
+      .from(syllable_structures)
+      .where(eq(syllable_structures.language_id, lang.data.id)),
+  ]);
+
+  const matches = structures.length
+    ? compilePhonotacticsMatcher((await loadLiteralTemplates(structures)).templates)
+    : null;
 
   return {
     ok: true,
     data: rows.map(({ tags, ...row }) => ({
       ...row,
       tags: tags.map(({ tag }) => tag as Tag),
+      fits_phonotactics: matches ? matches(row.term) : null,
     })),
   };
 }
