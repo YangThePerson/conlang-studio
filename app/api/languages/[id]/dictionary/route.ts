@@ -7,6 +7,8 @@ type Params = { params: Promise<{ id: string }> };
 /**
  * GET /api/languages/[id]/dictionary
  * Returns all lexemes (with senses and tags) for a language owned by the authenticated user.
+ * Each row also carries `fits_phonotactics` — whether the term fits the language's syllable
+ * templates, computed at read time (null when the language has no templates).
  * Returns 404 if the language doesn't exist or belongs to another user.
  */
 export async function GET(_req: Request, { params }: Params) {
