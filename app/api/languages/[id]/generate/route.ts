@@ -1,4 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { errorResponse } from '@/app/lib/http';
 import { generateWordSvc } from '@/app/lib/wordgen';
 
 /** Route segment params for language-specific generation endpoints. */
@@ -26,19 +27,7 @@ export async function GET(req: Request, { params }: Params) {
   };
 
   const result = await generateWordSvc(user, id, rawInput);
-
-  if (!result.ok) {
-    const status =
-      result.kind === 'not_found'
-        ? 404
-        : result.kind === 'invalid_id'
-          ? 400
-          : result.kind === 'unauthorized'
-            ? 401
-            : 400;
-    const issues = result.kind === 'validation' ? result.issues : undefined;
-    return Response.json({ error: result.kind, issues }, { status });
-  }
+  if (!result.ok) return errorResponse(result);
 
   return Response.json({
     words: [...result.data.words],

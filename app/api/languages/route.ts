@@ -1,4 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { resultResponse } from '@/app/lib/http';
 import { listLanguagesSvc, createLanguageSvc } from '@/app/lib/languages';
 
 /**
@@ -25,11 +26,5 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const result = await createLanguageSvc(user, body);
-
-  if (!result.ok) {
-    const issues = result.kind === 'validation' ? result.issues : undefined;
-    return Response.json({ error: result.kind, issues }, { status: 400 });
-  }
-
-  return Response.json(result.data, { status: 201 });
+  return resultResponse(result, 201);
 }

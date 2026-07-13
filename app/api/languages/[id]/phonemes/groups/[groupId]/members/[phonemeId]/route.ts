@@ -1,4 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { resultResponse } from '@/app/lib/http';
 import { removePhonemeFromGroupSvc } from '@/app/lib/phoneme-groups';
 
 /** Route segment params for group membership endpoints. */
@@ -17,11 +18,5 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   const { id, groupId, phonemeId } = await params;
   const result = await removePhonemeFromGroupSvc(user, id, phonemeId, groupId);
-
-  if (!result.ok) {
-    const status = result.kind === 'not_found' ? 404 : 400;
-    return Response.json({ error: result.kind }, { status });
-  }
-
-  return new Response(null, { status: 204 });
+  return resultResponse(result, 204);
 }

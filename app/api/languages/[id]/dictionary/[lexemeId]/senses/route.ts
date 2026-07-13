@@ -1,4 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { resultResponse } from '@/app/lib/http';
 import { addSenseToWordSvc } from '@/app/lib/dictionary';
 
 /** Route segment params for lexeme-sense endpoints. */
@@ -25,13 +26,5 @@ export async function POST(req: Request, { params }: Params) {
     ...body,
     lexeme_id: lexemeId,
   });
-
-  if (!result.ok) {
-    const status =
-      result.kind === 'not_found' ? 404 : result.kind === 'invalid_id' ? 400 : 400;
-    const issues = result.kind === 'validation' ? result.issues : undefined;
-    return Response.json({ error: result.kind, issues }, { status });
-  }
-
-  return Response.json(result.data, { status: 201 });
+  return resultResponse(result, 201);
 }

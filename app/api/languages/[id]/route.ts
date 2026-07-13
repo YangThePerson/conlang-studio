@@ -1,4 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { resultResponse } from '@/app/lib/http';
 import { updateLanguageSvc, deleteLanguageSvc } from '@/app/lib/languages';
 
 /** Route segment params for language-specific endpoints. */
@@ -16,14 +17,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
   const result = await updateLanguageSvc(user, id, body);
-
-  if (!result.ok) {
-    const status = result.kind === 'not_found' ? 404 : 400;
-    const issues = result.kind === 'validation' ? result.issues : undefined;
-    return Response.json({ error: result.kind, issues }, { status });
-  }
-
-  return Response.json(result.data);
+  return resultResponse(result);
 }
 
 /**
@@ -37,11 +31,5 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   const { id } = await params;
   const result = await deleteLanguageSvc(user, id);
-
-  if (!result.ok) {
-    const status = result.kind === 'not_found' ? 404 : 400;
-    return Response.json({ error: result.kind }, { status });
-  }
-
-  return new Response(null, { status: 204 });
+  return resultResponse(result, 204);
 }

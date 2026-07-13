@@ -1,4 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { resultResponse } from '@/app/lib/http';
 import { deleteLexemeSvc, updateLexemeSvc } from '@/app/lib/dictionary';
 
 /** Route segment params for lexeme-specific endpoints. */
@@ -18,14 +19,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const { lexemeId } = await params;
   const body = await req.json();
   const result = await updateLexemeSvc(user, lexemeId, body);
-
-  if (!result.ok) {
-    const status = result.kind === 'not_found' ? 404 : 400;
-    const issues = result.kind === 'validation' ? result.issues : undefined;
-    return Response.json({ error: result.kind, issues }, { status });
-  }
-
-  return Response.json(result.data);
+  return resultResponse(result);
 }
 
 /**
@@ -41,11 +35,5 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   const { lexemeId } = await params;
   const result = await deleteLexemeSvc(user, lexemeId);
-
-  if (!result.ok) {
-    const status = result.kind === 'not_found' ? 404 : 400;
-    return Response.json({ error: result.kind }, { status });
-  }
-
-  return new Response(null, { status: 204 });
+  return resultResponse(result, 204);
 }

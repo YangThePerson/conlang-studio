@@ -1,4 +1,5 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { resultResponse } from '@/app/lib/http';
 import { createPhonemeSvc, listPhonemesSvc } from '@/app/lib/phonemes';
 
 /** Route segment params for language-specific phoneme endpoints. */
@@ -15,21 +16,7 @@ export async function GET(_req: Request, { params }: Params) {
 
   const { id } = await params;
   const result = await listPhonemesSvc(user, id);
-
-  if (!result.ok) {
-    const status =
-      result.kind === 'not_found'
-        ? 404
-        : result.kind === 'invalid_id'
-          ? 400
-          : result.kind === 'unauthorized'
-            ? 401
-            : 400;
-    const issues = result.kind === 'validation' ? result.issues : undefined;
-    return Response.json({ error: result.kind, issues }, { status });
-  }
-
-  return Response.json(result.data);
+  return resultResponse(result);
 }
 
 /**
@@ -46,19 +33,5 @@ export async function POST(req: Request, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
   const result = await createPhonemeSvc(user, id, body);
-
-  if (!result.ok) {
-    const status =
-      result.kind === 'not_found'
-        ? 404
-        : result.kind === 'invalid_id'
-          ? 400
-          : result.kind === 'unauthorized'
-            ? 401
-            : 400;
-    const issues = result.kind === 'validation' ? result.issues : undefined;
-    return Response.json({ error: result.kind, issues }, { status });
-  }
-
-  return Response.json(result.data, { status: 201 });
+  return resultResponse(result, 201);
 }
