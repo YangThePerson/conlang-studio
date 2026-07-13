@@ -18,6 +18,9 @@ type Tag = typeof tags.$inferSelect;
 type CompleteLexeme = Lexeme & {
   senses: Sense[];
   tags: Tag[];
+  // Computed server-side against the language's syllable templates;
+  // null when the language has no templates to check against.
+  fits_phonotactics: boolean | null;
 };
 
 /**
@@ -453,6 +456,16 @@ function LexemeEntry({
       <tr className={'border-t ' + (isEven ? 'bg-zinc-900' : 'bg-zinc-800')}>
         <td rowSpan={lexemeRowSpan} className="py-2 font-mono">
           {lexeme.term}
+          {lexeme.fits_phonotactics === false && (
+            <span
+              role="img"
+              aria-label="Does not fit this language's syllable patterns"
+              title="Does not fit this language's syllable patterns"
+              className="ml-1 text-amber-500"
+            >
+              ⚠
+            </span>
+          )}
         </td>
         {firstSense ? (
           <>
