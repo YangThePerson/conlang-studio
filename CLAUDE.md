@@ -67,7 +67,10 @@ Helper modules (read their JSDoc before writing a new service function):
 ### `app/api/.../route.ts` — Route handler adapters
 
 - Same shape: resolve auth (`401` if null), `await params`, parse the body, call the **same** service function the corresponding action uses. Sharing only the schema is not enough — duplicated orchestration drifts.
-- Map the `Result` to HTTP: `ok` → `200`/`201` with the row (or `204` for deletes); `not_found` → `404`; everything else (`validation`, `invalid_id`, `conflict`) → `400` with `{ error: result.kind, issues? }` as the body.
+- Map the `Result` to HTTP with the helpers in `app/lib/http.ts` — never hand-roll the mapping in a handler:
+  - `resultResponse(result, successStatus?)` — the whole return statement for a standard handler: `200` by default, `201` for creates, `204` for deletes (empty body). Failures become the shared error shape.
+  - `errorResponse(result)` — just the failure branch, for handlers whose success body isn't the raw `result.data` (e.g. the wordgen route reshapes its payload).
+  - The kind → status table (`not_found` → `404`, `unauthorized` → `401`, `validation`/`invalid_id`/`conflict` → `400`, body `{ error: result.kind, issues? }`) lives once in `STATUS_BY_KIND` there.
 
 > **Mobile-auth caveat:** a mobile client authenticates with bearer tokens, not Clerk's cookie session, so route handlers will need a token-based resolver when a mobile client becomes real. The service layer is unaffected — it receives an already-resolved user. Until then the parallel route handlers are kept deliberately.
 
@@ -150,6 +153,6 @@ Intentionally out of scope now — listed so they aren't forgotten, not so they 
 - **Rate limiting** on sensitive operations once the app is public-facing.
 - **DB transactions** for any mutation touching more than one table.
 - **Token-based auth resolver** for route handlers, when a mobile client becomes real.
-- **`conflict` → `409`** in route handlers (currently falls through to `400`); if changed, change it in every handler at once.
+- **`conflict` → `409`** in route handlers (currently `400`); now a one-line change in `STATUS_BY_KIND` in `app/lib/http.ts`.
 - **Optimistic UI** (`useOptimistic`) where the round-trip feels slow.
 - **Shared UI primitives** (button, input, card) once duplication starts to hurt; design tokens/theming only if surfaces multiply.

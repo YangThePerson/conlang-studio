@@ -50,17 +50,14 @@ Reference: `app/languages/actions.ts`.
 
 ## 6. Route handlers — `app/api/languages/[id]/<feature>/route.ts` (+ `[entityId]/route.ts`)
 
-Reference: `app/api/languages/[id]/phonemes/[phonemeId]/route.ts`. Call the **same** Svc functions. `await params`. Status mapping:
+Reference: `app/api/languages/[id]/phonemes/[phonemeId]/route.ts`. Call the **same** Svc functions. `await params`. The Result → HTTP mapping is `resultResponse` from `app/lib/http.ts` — never hand-roll it:
 
 ```ts
-if (!result.ok) {
-  const status = result.kind === 'not_found' ? 404 : 400;
-  const issues = result.kind === 'validation' ? result.issues : undefined;
-  return Response.json({ error: result.kind, issues }, { status });
-}
+const result = await update<Entity>Svc(user, entityId, body);
+return resultResponse(result); // 200; pass 201 for creates, 204 for deletes
 ```
 
-`401` for unauthenticated (before calling the service); `201` for creates, `204` for deletes, `200` otherwise.
+`401` for unauthenticated stays in the handler (before calling the service). If the success body isn't the raw `result.data`, use `errorResponse(result)` for the failure branch and build the success response yourself (see the generate route).
 
 ## 7. UI — `app/languages/[id]/<feature>/`
 
