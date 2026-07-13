@@ -159,6 +159,55 @@ export function builtLiteralTemplates(
   return literalTemplates;
 }
 
+/**
+ * Loads the phonemes and phoneme groups referenced by `parsedStructures` and
+ * resolves them into {@link LiteralTemplate}s — the shared representation
+ * consumed by both word generation and the phonotactics matcher.
+ *
+ * Empty groups are reported by name rather than turned into a failure because
+ * callers disagree on severity: word generation rejects them (a slot that can
+ * never be filled makes generation impossible), while the phonotactics check
+ * tolerates them (a required slot with no symbols simply never matches, which
+ * is the correct legality semantics).
+ */
+export async function loadLiteralTemplates(
+  parsedStructures: SyllableStructure[],
+): Promise<{ templates: LiteralTemplate[]; emptyGroupNames: string[] }> {
+  const [phonemeIds, groupIds] = separateTemplateIds(parsedStructures);
+
+  const [phonemesList, groupsWithMembersList] = await Promise.all([
+    phonemeIds.size
+      ? db
+          .select()
+          .from(phonemes)
+          .where(inArray(phonemes.id, [...phonemeIds]))
+      : ([] as Phoneme[]),
+    groupIds.size
+      ? db.query.phoneme_groups.findMany({
+          where: inArray(phoneme_groups.id, [...groupIds]),
+          with: {
+            memberships: {
+              with: {
+                phoneme: true,
+              },
+            },
+          },
+        })
+      : ([] as GroupComplex[]),
+  ]);
+
+  return {
+    templates: builtLiteralTemplates(
+      phonemesList,
+      groupsWithMembersList,
+      parsedStructures,
+    ),
+    emptyGroupNames: groupsWithMembersList
+      .filter((g) => g.memberships.length === 0)
+      .map((g) => g.name),
+  };
+}
+
 export function generateWordSet(
   wordsToGenerate: number,
   minSyllables: number,
@@ -224,42 +273,13 @@ export async function generateWordSvc(
 
   if (!parsedStructures.length) return notFound();
 
-  const [phonemeIds, groupIds] = separateTemplateIds(parsedStructures);
+  const { templates: literalTemplates, emptyGroupNames } =
+    await loadLiteralTemplates(parsedStructures);
 
-  const [phonemesList, groupsWithMembersList] = await Promise.all([
-    phonemeIds.size
-      ? db
-          .select()
-          .from(phonemes)
-          .where(inArray(phonemes.id, [...phonemeIds]))
-      : ([] as Phoneme[]),
-    groupIds.size
-      ? db.query.phoneme_groups.findMany({
-          where: inArray(phoneme_groups.id, [...groupIds]),
-          with: {
-            memberships: {
-              with: {
-                phoneme: true,
-              },
-            },
-          },
-        })
-      : ([] as GroupComplex[]),
-  ]);
-
-  const emptyGroup = groupsWithMembersList.find(
-    (g) => g.memberships.length === 0,
-  );
-  if (emptyGroup)
+  if (emptyGroupNames.length)
     return validationMessage(
-      `Phoneme group "${emptyGroup.name}" has no members and cannot be used in word generation.`,
+      `Phoneme group "${emptyGroupNames[0]}" has no members and cannot be used in word generation.`,
     );
-
-  const literalTemplates = builtLiteralTemplates(
-    phonemesList,
-    groupsWithMembersList,
-    parsedStructures,
-  );
 
   const rng = seed !== undefined ? makeRng(seed) : Math.random;
   const syllableStream = generateRandomSyllableStream(literalTemplates, rng);
