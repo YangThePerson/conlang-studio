@@ -56,12 +56,12 @@ export async function parseAndRequireOwnedLanguage(
  * Structural check for a Postgres unique-constraint violation (`23505`).
  * Narrower than `instanceof Error` because `pg`/postgres-js errors aren't a
  * single class hierarchy — duck-typing the `code` field is the stable check.
+ * Recurses into `.cause` because Drizzle wraps the underlying driver error in
+ * a `DrizzleQueryError` whose own `code` field is absent — the real Postgres
+ * error (and its `code`) lives one level down at `error.cause`.
  */
 export function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    error.code === '23505'
-  );
+  if (typeof error !== 'object' || error === null) return false;
+  if ('code' in error && error.code === '23505') return true;
+  return 'cause' in error && isUniqueViolation(error.cause);
 }
