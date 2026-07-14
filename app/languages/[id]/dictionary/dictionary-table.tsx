@@ -1,7 +1,7 @@
 'use client';
 
 import { lexemes, senses, tags } from '@/app/db/schema';
-import { useActionState, useState } from 'react';
+import { useActionState, useMemo, useState } from 'react';
 import {
   addSenseToLexeme,
   createLexeme,
@@ -518,13 +518,165 @@ function LexemeEntry({
   );
 }
 
+type OriginFilter = 'all' | 'manual' | 'generated';
+type FitFilter = 'all' | 'fits' | 'violates';
+type Sort = 'term-asc' | 'term-desc' | 'default';
+
+/** Case-insensitive substring match against any searchable field of an entry. */
+function matchesQuery(lexeme: CompleteLexeme, query: string): boolean {
+  const q = query.toLowerCase();
+  return (
+    lexeme.term.toLowerCase().includes(q) ||
+    (lexeme.notes ?? '').toLowerCase().includes(q) ||
+    lexeme.senses.some(
+      (s) =>
+        s.definition.toLowerCase().includes(q) ||
+        s.part_of_speech.toLowerCase().includes(q),
+    )
+  );
+}
+
+/**
+ * Filter/sort controls rendered above the table. Purely client-side — the full
+ * dictionary is already in props, so narrowing never refetches. The Tag select
+ * only renders when the data actually contains tags; `fits`/`violates` options
+ * exclude entries whose flag is `null` (no syllable structures to check
+ * against), which therefore appear only under "All".
+ */
+function DictionaryControls({
+  tagOptions,
+  query,
+  setQuery,
+  tagFilter,
+  setTagFilter,
+  originFilter,
+  setOriginFilter,
+  fitFilter,
+  setFitFilter,
+  sort,
+  setSort,
+}: {
+  tagOptions: Tag[];
+  query: string;
+  setQuery: (v: string) => void;
+  tagFilter: string;
+  setTagFilter: (v: string) => void;
+  originFilter: OriginFilter;
+  setOriginFilter: (v: OriginFilter) => void;
+  fitFilter: FitFilter;
+  setFitFilter: (v: FitFilter) => void;
+  sort: Sort;
+  setSort: (v: Sort) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-col gap-1 flex-1 min-w-48">
+        <label htmlFor="dictionary-search" className="text-sm">
+          Search
+        </label>
+        <input
+          id="dictionary-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="border rounded p-2"
+        />
+      </div>
+      {tagOptions.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="dictionary-tag-filter" className="text-sm">
+            Tag
+          </label>
+          <select
+            id="dictionary-tag-filter"
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="border rounded p-2"
+          >
+            <option value="all">All tags</option>
+            {tagOptions.map((tag) => (
+              <option className="bg-black" key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="dictionary-origin-filter" className="text-sm">
+          Origin
+        </label>
+        <select
+          id="dictionary-origin-filter"
+          value={originFilter}
+          onChange={(e) => setOriginFilter(e.target.value as OriginFilter)}
+          className="border rounded p-2"
+        >
+          <option className="bg-black" value="all">
+            All origins
+          </option>
+          <option className="bg-black" value="manual">
+            Manual
+          </option>
+          <option className="bg-black" value="generated">
+            Generated
+          </option>
+        </select>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="dictionary-fit-filter" className="text-sm">
+          Phonotactics
+        </label>
+        <select
+          id="dictionary-fit-filter"
+          value={fitFilter}
+          onChange={(e) => setFitFilter(e.target.value as FitFilter)}
+          className="border rounded p-2"
+        >
+          <option className="bg-black" value="all">
+            All
+          </option>
+          <option className="bg-black" value="fits">
+            Fits
+          </option>
+          <option className="bg-black" value="violates">
+            Doesn&apos;t fit
+          </option>
+        </select>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="dictionary-sort" className="text-sm">
+          Sort
+        </label>
+        <select
+          id="dictionary-sort"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as Sort)}
+          className="border rounded p-2"
+        >
+          <option className="bg-black" value="term-asc">
+            Term A→Z
+          </option>
+          <option className="bg-black" value="term-desc">
+            Term Z→A
+          </option>
+          <option className="bg-black" value="default">
+            Original order
+          </option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Dictionary table: read-only by default, with a per-entry edit mode (matching
  * the phonemes/syllables pages) that exposes lexeme and sense editing,
  * sense creation, and entry deletion. Receives server-fetched data as props;
- * mutations go through Server Actions which revalidate the page on success.
- * `languageId` comes from the page rather than the rows so the Add Word form
- * works when the dictionary is empty.
+ * mutations go through Server Actions which revalidate the page on success —
+ * filter/sort state lives here in the client, so it survives those
+ * revalidations. `languageId` comes from the page rather than the rows so the
+ * Add Word form works when the dictionary is empty.
  */
 export default function DictionaryTable({
   languageId,
@@ -533,6 +685,38 @@ export default function DictionaryTable({
   languageId: string;
   dictionary: CompleteLexeme[];
 }) {
+  const [query, setQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState('all');
+  const [originFilter, setOriginFilter] = useState<OriginFilter>('all');
+  const [fitFilter, setFitFilter] = useState<FitFilter>('all');
+  const [sort, setSort] = useState<Sort>('term-asc');
+
+  // Tag dropdown options come from the tags actually attached to entries —
+  // deduped by id and name-sorted — rather than a separate fetch of the
+  // language's full tag list.
+  const tagOptions = useMemo(() => {
+    const byId = new Map<string, Tag>();
+    for (const lexeme of dictionary)
+      for (const tag of lexeme.tags) byId.set(tag.id, tag);
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [dictionary]);
+
+  const visible = useMemo(() => {
+    const trimmed = query.trim();
+    const filtered = dictionary.filter(
+      (lexeme) =>
+        (trimmed === '' || matchesQuery(lexeme, trimmed)) &&
+        (tagFilter === 'all' ||
+          lexeme.tags.some((tag) => tag.id === tagFilter)) &&
+        (originFilter === 'all' || lexeme.origin === originFilter) &&
+        (fitFilter === 'all' ||
+          lexeme.fits_phonotactics === (fitFilter === 'fits')),
+    );
+    if (sort === 'default') return filtered;
+    const direction = sort === 'term-asc' ? 1 : -1;
+    return filtered.sort((a, b) => direction * a.term.localeCompare(b.term));
+  }, [dictionary, query, tagFilter, originFilter, fitFilter, sort]);
+
   return (
     <div className="flex flex-col gap-4">
       <AddLexemeForm languageId={languageId} />
@@ -541,7 +725,36 @@ export default function DictionaryTable({
           No words yet — add one above, or bank some from the word generator.
         </p>
       ) : (
-        <LexemeTable dictionary={dictionary} />
+        <>
+          <DictionaryControls
+            tagOptions={tagOptions}
+            query={query}
+            setQuery={setQuery}
+            tagFilter={tagFilter}
+            setTagFilter={setTagFilter}
+            originFilter={originFilter}
+            setOriginFilter={setOriginFilter}
+            fitFilter={fitFilter}
+            setFitFilter={setFitFilter}
+            sort={sort}
+            setSort={setSort}
+          />
+          {visible.length === 0 ? (
+            <p className="text-gray-500">
+              No entries match the current filters.
+            </p>
+          ) : (
+            <>
+              {visible.length < dictionary.length && (
+                <p className="text-gray-500 text-sm">
+                  Showing {visible.length} of {dictionary.length}{' '}
+                  {dictionary.length === 1 ? 'entry' : 'entries'}
+                </p>
+              )}
+              <LexemeTable dictionary={visible} />
+            </>
+          )}
+        </>
       )}
     </div>
   );
