@@ -205,6 +205,22 @@ export const createTagSchema = z.object({
   name: z.string().min(1),
 });
 
+/**
+ * Validates the client-supplied fields for creating a tag.
+ * `language_id` is intentionally absent — it comes from the route segment/action argument, not the request body.
+ */
+export const createTagInputSchema = z.object({
+  name: z.string().min(1),
+});
+
+/**
+ * Validates the client-supplied fields for renaming a tag.
+ * A tag's `language_id` is never updatable — a tag can't move to another language.
+ */
+export const updateTagInputSchema = z.object({
+  name: z.string().min(1),
+});
+
 /** Validates attaching a tag to a lexeme. */
 export const createLexemeTagSchema = z.object({
   lexeme_id: z.uuid(),
