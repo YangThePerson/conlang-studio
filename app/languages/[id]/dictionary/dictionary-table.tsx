@@ -4,12 +4,16 @@ import { lexemes, senses, tags } from '@/app/db/schema';
 import { useActionState, useMemo, useState } from 'react';
 import {
   addSenseToLexeme,
+  attachTag,
   createLexeme,
   deleteLexeme,
   deleteSense,
+  detachTag,
   updateLexeme,
   updateSense,
 } from './actions';
+import { failureMessage, fieldError } from './action-state';
+import TagManager from './tag-manager';
 
 type Lexeme = typeof lexemes.$inferSelect;
 type Sense = typeof senses.$inferSelect;
@@ -22,46 +26,6 @@ type CompleteLexeme = Lexeme & {
   // null when the language has no templates to check against.
   fits_phonotactics: boolean | null;
 };
-
-/**
- * The slice of an action `Result` the UI needs to render failures. Typed
- * structurally so this client file doesn't import from `app/lib/*`.
- */
-type ActionState =
-  | { ok: true }
-  | { ok: false; kind: string; issues?: unknown }
-  | null;
-
-/**
- * Extracts the first error message for a field from a validation failure's
- * `issues` (the `z.treeifyError` output). Defensive because `issues` crosses
- * the action boundary typed as `unknown`.
- */
-function fieldError(state: ActionState, field: string): string | undefined {
-  if (!state || state.ok || state.kind !== 'validation') return undefined;
-  if (typeof state.issues !== 'object' || state.issues === null)
-    return undefined;
-  const { properties } = state.issues as {
-    properties?: Record<string, { errors?: string[] } | undefined>;
-  };
-  return properties?.[field]?.errors?.[0];
-}
-
-/**
- * User-facing message for non-validation failures. Validation failures return
- * undefined here — they are rendered as field-level errors via `fieldError`.
- */
-function failureMessage(state: ActionState): string | undefined {
-  if (!state || state.ok || state.kind === 'validation') return undefined;
-  switch (state.kind) {
-    case 'unauthorized':
-      return 'You must be signed in.';
-    case 'not_found':
-      return 'Not found — it may have been deleted.';
-    default:
-      return 'Something went wrong. Please try again.';
-  }
-}
 
 /**
  * Form for adding a word to the dictionary by hand (origin 'manual', as
@@ -295,18 +259,134 @@ function SenseEditRow({
   );
 }
 
+/** One tag chip in the edit card, with its own detach button. */
+function TagChip({
+  languageId,
+  lexemeId,
+  tag,
+  deleteLexemePending,
+}: {
+  languageId: string;
+  lexemeId: string;
+  tag: Tag;
+  deleteLexemePending: boolean;
+}) {
+  const [state, action, pending] = useActionState(
+    detachTag.bind(null, languageId, lexemeId, tag.id),
+    null,
+  );
+  const error = failureMessage(state);
+
+  return (
+    <form action={action} className="flex flex-col items-start gap-1">
+      <span className="inline-flex items-center gap-1 bg-zinc-700 rounded px-2 py-1 text-sm">
+        {tag.name}
+        <button
+          type="submit"
+          disabled={pending || deleteLexemePending}
+          aria-label={`Remove tag ${tag.name}`}
+          title={`Remove tag ${tag.name}`}
+          className="cursor-pointer disabled:opacity-50 disabled:cursor-progress"
+        >
+          ×
+        </button>
+      </span>
+      {error && <p className="text-red-500 text-xs">{error}</p>}
+    </form>
+  );
+}
+
+/**
+ * Form for attaching a tag to a lexeme, offered as a `<select>` of the
+ * language's tags not already on it. Shows a hint instead of the form when
+ * there is nothing left to offer (every tag attached, or none exist yet).
+ */
+function AttachTagForm({
+  languageId,
+  lexemeId,
+  availableTags,
+  deleteLexemePending,
+}: {
+  languageId: string;
+  lexemeId: string;
+  availableTags: Tag[];
+  deleteLexemePending: boolean;
+}) {
+  const [tagId, setTagId] = useState('');
+
+  const [state, formAction, pending] = useActionState(
+    async (
+      prev: Awaited<ReturnType<typeof attachTag>> | null,
+      formData: FormData,
+    ) => {
+      const result = await attachTag(languageId, lexemeId, prev, formData);
+      if (result.ok) setTagId('');
+      return result;
+    },
+    null,
+  );
+
+  const error = failureMessage(state);
+
+  if (availableTags.length === 0)
+    return (
+      <p className="text-sm text-gray-500">
+        No more tags to add — create one in Manage tags above.
+      </p>
+    );
+
+  return (
+    <form action={formAction} className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`attach-tag-${lexemeId}`} className="text-sm">
+          Add tag
+        </label>
+        <select
+          id={`attach-tag-${lexemeId}`}
+          name="tag_id"
+          value={tagId}
+          onChange={(e) => setTagId(e.target.value)}
+          className="border rounded p-2 w-40"
+          required
+        >
+          <option value="" disabled>
+            Select a tag
+          </option>
+          {availableTags.map((tag) => (
+            <option className="bg-black" key={tag.id} value={tag.id}>
+              {tag.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="submit"
+        disabled={pending || deleteLexemePending || tagId === ''}
+        className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+      >
+        {pending ? 'Adding…' : 'Attach'}
+      </button>
+      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+    </form>
+  );
+}
+
 /**
  * Full edit UI for one dictionary entry, shown in place of its view rows: the
  * lexeme's own fields, each sense with inline save/delete, an Add Sense form,
- * and entry deletion. Saves are granular — each form commits independently so
- * every submit maps to a single service call and no multi-table transaction is
- * needed. Tags are display-only for now; tag editing is a separate feature.
+ * tag attach/detach, and entry deletion. Saves are granular — each form
+ * commits independently so every submit maps to a single service call and no
+ * multi-table transaction is needed. `allTags` is the language's full tag
+ * inventory (from the page), used to compute which tags are still available
+ * to attach.
  */
 function LexemeEditCard({
   lexeme,
+  allTags,
   close,
 }: {
   lexeme: CompleteLexeme;
+  allTags: Tag[];
   close: () => void;
 }) {
   const [term, setTerm] = useState(lexeme.term);
@@ -325,6 +405,10 @@ function LexemeEditCard({
     failureMessage(saveState) ??
     failureMessage(deleteState) ??
     fieldError(saveState, 'term');
+
+  const availableTags = allTags.filter(
+    (tag) => !lexeme.tags.some((t) => t.id === tag.id),
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -388,6 +472,30 @@ function LexemeEditCard({
         />
       </div>
 
+      {/* Tags */}
+      <div className="flex flex-col gap-2 border-t pt-3">
+        <p className="font-semibold text-sm">Tags</p>
+        {lexeme.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {lexeme.tags.map((tag) => (
+              <TagChip
+                key={tag.id}
+                languageId={lexeme.language_id}
+                lexemeId={lexeme.id}
+                tag={tag}
+                deleteLexemePending={deletePending}
+              />
+            ))}
+          </div>
+        )}
+        <AttachTagForm
+          languageId={lexeme.language_id}
+          lexemeId={lexeme.id}
+          availableTags={availableTags}
+          deleteLexemePending={deletePending}
+        />
+      </div>
+
       {/* Entry-level controls */}
       <div className="flex items-center justify-end gap-2 border-t pt-3">
         <form action={deleteAction}>
@@ -424,9 +532,11 @@ function LexemeEditCard({
 function LexemeEntry({
   lexeme,
   isEven,
+  allTags,
 }: {
   lexeme: CompleteLexeme;
   isEven: boolean;
+  allTags: Tag[];
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -441,7 +551,11 @@ function LexemeEntry({
     return (
       <tr className="border-t">
         <td colSpan={6} className="p-4 text-left">
-          <LexemeEditCard lexeme={lexeme} close={() => setIsEditing(false)} />
+          <LexemeEditCard
+            lexeme={lexeme}
+            allTags={allTags}
+            close={() => setIsEditing(false)}
+          />
         </td>
       </tr>
     );
@@ -671,19 +785,24 @@ function DictionaryControls({
 
 /**
  * Dictionary table: read-only by default, with a per-entry edit mode (matching
- * the phonemes/syllables pages) that exposes lexeme and sense editing,
- * sense creation, and entry deletion. Receives server-fetched data as props;
- * mutations go through Server Actions which revalidate the page on success —
- * filter/sort state lives here in the client, so it survives those
- * revalidations. `languageId` comes from the page rather than the rows so the
- * Add Word form works when the dictionary is empty.
+ * the phonemes/syllables pages) that exposes lexeme and sense editing, tag
+ * attach/detach, sense creation, and entry deletion. Receives server-fetched
+ * data as props; mutations go through Server Actions which revalidate the
+ * page on success — filter/sort state lives here in the client, so it
+ * survives those revalidations. `languageId` comes from the page rather than
+ * the rows so the Add Word form works when the dictionary is empty. `allTags`
+ * is the language's full tag inventory (separate from the tags attached to
+ * any one entry) — it drives the tag filter, the tag manager, and the
+ * edit card's attach picker.
  */
 export default function DictionaryTable({
   languageId,
   dictionary,
+  allTags,
 }: {
   languageId: string;
   dictionary: CompleteLexeme[];
+  allTags: Tag[];
 }) {
   const [query, setQuery] = useState('');
   const [tagFilter, setTagFilter] = useState('all');
@@ -691,23 +810,20 @@ export default function DictionaryTable({
   const [fitFilter, setFitFilter] = useState<FitFilter>('all');
   const [sort, setSort] = useState<Sort>('term-asc');
 
-  // Tag dropdown options come from the tags actually attached to entries —
-  // deduped by id and name-sorted — rather than a separate fetch of the
-  // language's full tag list.
-  const tagOptions = useMemo(() => {
-    const byId = new Map<string, Tag>();
-    for (const lexeme of dictionary)
-      for (const tag of lexeme.tags) byId.set(tag.id, tag);
-    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [dictionary]);
+  // If the selected tag was deleted since it was chosen, fall back to "all"
+  // rather than silently filtering everything out against a ghost id.
+  const effectiveTagFilter =
+    tagFilter !== 'all' && !allTags.some((tag) => tag.id === tagFilter)
+      ? 'all'
+      : tagFilter;
 
   const visible = useMemo(() => {
     const trimmed = query.trim();
     const filtered = dictionary.filter(
       (lexeme) =>
         (trimmed === '' || matchesQuery(lexeme, trimmed)) &&
-        (tagFilter === 'all' ||
-          lexeme.tags.some((tag) => tag.id === tagFilter)) &&
+        (effectiveTagFilter === 'all' ||
+          lexeme.tags.some((tag) => tag.id === effectiveTagFilter)) &&
         (originFilter === 'all' || lexeme.origin === originFilter) &&
         (fitFilter === 'all' ||
           lexeme.fits_phonotactics === (fitFilter === 'fits')),
@@ -715,11 +831,12 @@ export default function DictionaryTable({
     if (sort === 'default') return filtered;
     const direction = sort === 'term-asc' ? 1 : -1;
     return filtered.sort((a, b) => direction * a.term.localeCompare(b.term));
-  }, [dictionary, query, tagFilter, originFilter, fitFilter, sort]);
+  }, [dictionary, query, effectiveTagFilter, originFilter, fitFilter, sort]);
 
   return (
     <div className="flex flex-col gap-4">
       <AddLexemeForm languageId={languageId} />
+      <TagManager languageId={languageId} tags={allTags} />
       {dictionary.length === 0 ? (
         <p className="text-gray-500">
           No words yet — add one above, or bank some from the word generator.
@@ -727,10 +844,10 @@ export default function DictionaryTable({
       ) : (
         <>
           <DictionaryControls
-            tagOptions={tagOptions}
+            tagOptions={allTags}
             query={query}
             setQuery={setQuery}
-            tagFilter={tagFilter}
+            tagFilter={effectiveTagFilter}
             setTagFilter={setTagFilter}
             originFilter={originFilter}
             setOriginFilter={setOriginFilter}
@@ -751,7 +868,7 @@ export default function DictionaryTable({
                   {dictionary.length === 1 ? 'entry' : 'entries'}
                 </p>
               )}
-              <LexemeTable dictionary={visible} />
+              <LexemeTable dictionary={visible} allTags={allTags} />
             </>
           )}
         </>
@@ -761,7 +878,13 @@ export default function DictionaryTable({
 }
 
 /** The dictionary rows themselves; rendered only when at least one word exists. */
-function LexemeTable({ dictionary }: { dictionary: CompleteLexeme[] }) {
+function LexemeTable({
+  dictionary,
+  allTags,
+}: {
+  dictionary: CompleteLexeme[];
+  allTags: Tag[];
+}) {
   return (
     <table className="w-full border table-fixed wrap-break-word">
       <thead>
@@ -788,7 +911,12 @@ function LexemeTable({ dictionary }: { dictionary: CompleteLexeme[] }) {
       </thead>
       <tbody className="text-center">
         {dictionary.map((lexeme, i) => (
-          <LexemeEntry lexeme={lexeme} key={lexeme.id} isEven={i % 2 === 0} />
+          <LexemeEntry
+            lexeme={lexeme}
+            key={lexeme.id}
+            isEven={i % 2 === 0}
+            allTags={allTags}
+          />
         ))}
       </tbody>
     </table>
