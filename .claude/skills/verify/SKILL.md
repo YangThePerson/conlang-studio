@@ -34,8 +34,8 @@ Everything meaningful sits behind Clerk. What you can verify **without** a sessi
 
 Full UI verification requires a signed-in browser session. Options, in order of preference:
 
-1. **Ask the user to click through the affected flow** and report what they see — this is a solo-dev project with the owner present.
-2. <!-- TODO(owner): if you create a Clerk dev test account (email + password with the dev-instance test mode), document the credentials source here (e.g. env var names) — never the literal secrets. Until then, option 1 is the way. -->
+1. **Sign in as the test account.** A dedicated Clerk dev-instance test user exists; its credentials are in `.env` as `CLERK_TEST_USER_EMAIL` / `CLERK_TEST_USER_PASSWORD` (never hardcode them elsewhere). Drive the sign-in form at http://localhost:3000 with that email + password. The instance has device verification enabled, so a fresh browser/client gets an email-code challenge **after** the password step; the email uses Clerk's `+clerk_test` convention, so the code is always the fixed test value `424242` — no real email is sent. Rows this account creates live in the real dev DB: clean up whatever the verification created.
+2. **Ask the user to click through the affected flow** — fallback if the test session can't be established (e.g. Clerk auth options changed).
 
 ### Service-layer verification (bypasses the auth wall)
 
