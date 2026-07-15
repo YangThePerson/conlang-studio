@@ -3,6 +3,7 @@ import { listPhonemeGroupsWithMembersSvc } from '@/app/lib/phoneme-groups';
 import { listPhonemesSvc } from '@/app/lib/phonemes';
 import { listRulesSvc } from '@/app/lib/rules';
 import { redirect } from 'next/navigation';
+import RuleList from './rule-list';
 
 /**
  * Phonological rules page for a language. Fetches phonemes and groups (the
@@ -30,6 +31,12 @@ export default async function RulesPage({
   return (
     <section>
       <h1 className="text-2xl font-semibold mb-6">Rules</h1>
+      <RuleList
+        languageId={id}
+        phonemes={phonemesResult.data}
+        groups={groupsResult.data}
+        rules={rulesResult.data}
+      />
     </section>
   );
 }
