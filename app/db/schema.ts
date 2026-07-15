@@ -252,6 +252,29 @@ export const groupMembershipsRelations = relations(
   }),
 );
 
+export const rulesRelations = relations(rules, ({ one }) => ({
+  language: one(languages, {
+    fields: [rules.language_id],
+    references: [languages.id],
+  }),
+  // Two relations into the same table (phonemes) need explicit relationNames
+  // so Drizzle can tell them apart.
+  targetPhoneme: one(phonemes, {
+    fields: [rules.target_phoneme_id],
+    references: [phonemes.id],
+    relationName: 'rule_target_phoneme',
+  }),
+  outputPhoneme: one(phonemes, {
+    fields: [rules.output_phoneme_id],
+    references: [phonemes.id],
+    relationName: 'rule_output_phoneme',
+  }),
+  targetGroup: one(phoneme_groups, {
+    fields: [rules.target_group_id],
+    references: [phoneme_groups.id],
+  }),
+}));
+
 export const lexemesRelations = relations(lexemes, ({ one, many }) => ({
   language: one(languages, {
     fields: [lexemes.language_id],
