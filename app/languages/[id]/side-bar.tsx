@@ -7,6 +7,7 @@ const sections = [
   { label: 'Overview', path: '' },
   { label: 'Phonemes & Groups', path: '/phonemes' },
   { label: 'Syllable Structures', path: '/syllables' },
+  { label: 'Rules', path: '/rules' },
   { label: 'Dictionary', path: '/dictionary' },
   { label: 'Word Generator', path: '/wordgen' },
 ];
