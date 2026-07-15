@@ -19,6 +19,7 @@ import {
   parseAndRequireOwnedLanguage,
 } from './ownership';
 import { isReferencedInSyllableTemplates } from './syllables';
+import { isReferencedInRules } from './rules';
 
 type Phoneme = typeof phonemes.$inferSelect;
 type PhonemeGroup = typeof phoneme_groups.$inferSelect;
@@ -290,8 +291,8 @@ export async function removePhonemeFromGroupSvc(
 /**
  * Deletes a phoneme group, verifying ownership through the language table.
  * Returns `{ ok: false, kind: 'not_found' }` if the phoneme group doesn't exist or belongs to another user's language.
- * Returns `{ ok: false, kind: 'conflict' }` if any syllable structure template references this group —
- * the caller should prompt the user to remove it from those templates first.
+ * Returns `{ ok: false, kind: 'conflict' }` if any syllable structure template or rule
+ * references this group — the caller should prompt the user to remove it from those first.
  */
 export async function deletePhonemeGroupSvc(
   user: DbUser,
@@ -312,12 +313,11 @@ export async function deletePhonemeGroupSvc(
     .limit(1);
   if (!group) return notFound();
 
-  const referenced = await isReferencedInSyllableTemplates(
-    group.language_id,
-    'groupId',
-    group.id,
-  );
-  if (referenced) return conflict();
+  const [inTemplates, inRules] = await Promise.all([
+    isReferencedInSyllableTemplates(group.language_id, 'groupId', group.id),
+    isReferencedInRules(group.language_id, 'groupId', group.id),
+  ]);
+  if (inTemplates || inRules) return conflict();
 
   const [deleted] = await db
     .delete(phoneme_groups)

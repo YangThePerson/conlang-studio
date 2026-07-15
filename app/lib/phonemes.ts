@@ -1,11 +1,15 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/app/db';
 import { phonemes, users } from '@/app/db/schema';
-import { createPhonemeInputSchema, updatePhonemeInputSchema } from '@/app/db/validation';
+import {
+  createPhonemeInputSchema,
+  updatePhonemeInputSchema,
+} from '@/app/db/validation';
 import { conflict, notFound, type Result } from './result';
 import { parseUuid, parseInput } from './parse';
 import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
 import { isReferencedInSyllableTemplates } from './syllables';
+import { isReferencedInRules } from './rules';
 
 type Phoneme = typeof phonemes.$inferSelect;
 type DbUser = typeof users.$inferSelect;
@@ -92,8 +96,8 @@ export async function updatePhonemeSvc(
 /**
  * Deletes a phoneme, verifying ownership through the language table.
  * Returns `{ ok: false, kind: 'not_found' }` if the phoneme doesn't exist or belongs to another user's language.
- * Returns `{ ok: false, kind: 'conflict' }` if any syllable structure template references this phoneme —
- * the caller should prompt the user to remove it from those templates first.
+ * Returns `{ ok: false, kind: 'conflict' }` if any syllable structure template or rule
+ * references this phoneme — the caller should prompt the user to remove it from those first.
  */
 export async function deletePhonemeSvc(
   user: DbUser,
@@ -114,12 +118,15 @@ export async function deletePhonemeSvc(
     .limit(1);
   if (!phoneme) return notFound();
 
-  const referenced = await isReferencedInSyllableTemplates(
-    phoneme.language_id,
-    'phonemeId',
-    phoneme.id,
-  );
-  if (referenced) return conflict();
+  const [inTemplates, inRules] = await Promise.all([
+    isReferencedInSyllableTemplates(
+      phoneme.language_id,
+      'phonemeId',
+      phoneme.id,
+    ),
+    isReferencedInRules(phoneme.language_id, 'phonemeId', phoneme.id),
+  ]);
+  if (inTemplates || inRules) return conflict();
 
   const [deleted] = await db
     .delete(phonemes)
