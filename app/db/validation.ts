@@ -135,6 +135,50 @@ export const createRuleSchema = z
   );
 
 /**
+ * Shared shape for creating and updating a phonological rule from client input.
+ * `language_id` is intentionally absent — it comes from the route segment, not the request body.
+ * `position` is intentionally absent — it is assigned server-side on create (appended to the
+ * end of the language's rule order) and changed only through the dedicated move operation.
+ * Exactly one of `target_phoneme_id` or `target_group_id` must be present (mirrors the
+ * `target_check` DB constraint). Boundary slots are accepted anywhere inside a context —
+ * restricting them to the outer edge is deliberately not enforced.
+ */
+const ruleInputSchema = z
+  .object({
+    target_phoneme_id: z.uuid().optional(),
+    target_group_id: z.uuid().optional(),
+    output_phoneme_id: z.uuid(),
+    left_context: contextSchema,
+    right_context: contextSchema,
+  })
+  .refine(
+    (v) =>
+      (v.target_phoneme_id !== undefined) !== (v.target_group_id !== undefined),
+    {
+      message:
+        'Exactly one of target_phoneme_id or target_group_id must be set',
+    },
+  );
+
+/** Validates the client-supplied fields for creating a phonological rule. See {@link ruleInputSchema}. */
+export const createRuleInputSchema = ruleInputSchema;
+
+/**
+ * Validates the client-supplied fields for updating a phonological rule.
+ * Same shape as {@link createRuleInputSchema} — rule updates are full replacements,
+ * not partial patches (the edit form always holds the whole rule).
+ */
+export const updateRuleInputSchema = ruleInputSchema;
+
+/**
+ * Validates the body of a rule reorder request: move the rule one step earlier
+ * (`up`) or later (`down`) in its language's application order.
+ */
+export const moveRuleInputSchema = z.object({
+  direction: z.enum(['up', 'down']),
+});
+
+/**
  * Validates a new lexeme (dictionary entry). `notes` is optional free-form text.
  * `origin` is intentionally required (no default) here — it is set by the calling
  * service ('manual' from the dictionary create action, 'generated' from wordgen
