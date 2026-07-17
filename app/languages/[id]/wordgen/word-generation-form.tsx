@@ -65,9 +65,11 @@ function WordGenControls({
 
   // Mirrors this component's own transition state up to the parent so WordPanel
   // (a sibling, not a descendant of this transition) can show its own pending UI.
+  // `setPending` is a bare `useState` setter passed down from the parent — stable
+  // across renders — so including it here doesn't cause extra effect runs.
   useEffect(() => {
     setPending(pending);
-  }, [pending]);
+  }, [pending, setPending]);
 
   if (!structures.length)
     return (
