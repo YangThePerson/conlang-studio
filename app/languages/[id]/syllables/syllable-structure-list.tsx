@@ -2,7 +2,7 @@
 
 import { phonemes, syllable_structures } from '@/app/db/schema';
 import type { PhonemeGroupWithMembers } from '@/app/lib/phoneme-groups';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useState } from 'react';
 import {
   createSyllableStructure,
   deleteSyllableStructure,
@@ -40,14 +40,19 @@ function AddSyllableStructureForm({
 }) {
   const [isAdding, setIsAdding] = useState(false);
 
-  const [state, formAction, pending] = useActionState(
-    createSyllableStructure.bind(null, languageId),
+  // Wrapped (rather than plain-bound) so the form can close itself on
+  // success from the event, avoiding a setState-in-effect.
+  const [, formAction, pending] = useActionState(
+    async (
+      prev: Awaited<ReturnType<typeof createSyllableStructure>> | null,
+      formData: FormData,
+    ) => {
+      const result = await createSyllableStructure(languageId, prev, formData);
+      if (result.ok) setIsAdding(false);
+      return result;
+    },
     null,
   );
-
-  useEffect(() => {
-    if (state?.ok) setIsAdding(false);
-  }, [state]);
 
   return (
     <div className="mb-6">
@@ -95,14 +100,24 @@ function SyllableStructureRow({
     null,
   );
 
-  const [editState, editAction, editPending] = useActionState(
-    updateSyllableStructure.bind(null, languageId, structure.id),
+  // Wrapped (rather than plain-bound) so the row can leave edit mode on
+  // success from the event, avoiding a setState-in-effect.
+  const [, editAction, editPending] = useActionState(
+    async (
+      prev: Awaited<ReturnType<typeof updateSyllableStructure>> | null,
+      formData: FormData,
+    ) => {
+      const result = await updateSyllableStructure(
+        languageId,
+        structure.id,
+        prev,
+        formData,
+      );
+      if (result.ok) setIsEditing(false);
+      return result;
+    },
     null,
   );
-
-  useEffect(() => {
-    if (editState?.ok) setIsEditing(false);
-  }, [editState]);
 
   if (isEditing)
     return (

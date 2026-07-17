@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useId, useState } from 'react';
+import { useActionState, useId, useState } from 'react';
 import { createPhoneme, updatePhoneme, deletePhoneme } from './actions';
 import type { phonemes } from '@/app/db/schema';
 
@@ -21,14 +21,19 @@ function PhonemeRow({
     null,
   );
 
+  // Wrapped (rather than plain-bound) so the row can leave edit mode on
+  // success from the event, avoiding a setState-in-effect.
   const [editState, editAction, editPending] = useActionState(
-    updatePhoneme.bind(null, languageId, phoneme.id),
+    async (
+      prev: Awaited<ReturnType<typeof updatePhoneme>> | null,
+      formData: FormData,
+    ) => {
+      const result = await updatePhoneme(languageId, phoneme.id, prev, formData);
+      if (result.ok) setIsEditing(false);
+      return result;
+    },
     null,
   );
-
-  useEffect(() => {
-    if (editState?.ok) setIsEditing(false);
-  }, [editState]);
 
   if (isEditing) {
     return (

@@ -2,7 +2,7 @@
 
 import { phonemes } from '@/app/db/schema';
 import { PhonemeGroupWithMembers } from '@/app/lib/phoneme-groups';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useState } from 'react';
 import { createGroup, deleteGroup, updateGroup } from './actions';
 
 type Phoneme = typeof phonemes.$inferSelect;
@@ -133,14 +133,19 @@ function GroupRow({
     null,
   );
 
+  // Wrapped (rather than plain-bound) so the row can leave edit mode on
+  // success from the event, avoiding a setState-in-effect.
   const [editState, editAction, editPending] = useActionState(
-    updateGroup.bind(null, languageId, group.id),
+    async (
+      prev: Awaited<ReturnType<typeof updateGroup>> | null,
+      formData: FormData,
+    ) => {
+      const result = await updateGroup(languageId, group.id, prev, formData);
+      if (result.ok) setIsEditing(false);
+      return result;
+    },
     null,
   );
-
-  useEffect(() => {
-    if (editState?.ok) setIsEditing(false);
-  }, [editState]);
 
   if (isEditing) {
     return (

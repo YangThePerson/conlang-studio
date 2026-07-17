@@ -11,6 +11,7 @@ vi.mock('../../db', () => ({
 }));
 
 import { db } from '../../db';
+import type { syllable_structures, users } from '../../db/schema';
 import {
   selectRandomItemByWeight,
   generateRandomSyllableStream,
@@ -21,10 +22,21 @@ import {
   generateWordSvc,
 } from '../wordgen';
 
+type SyllableStructure = typeof syllable_structures.$inferSelect;
+
 /** Creates an Rng that cycles through `values` in order, wrapping around. */
 function seqRng(values: number[]) {
   let i = 0;
   return () => values[i++ % values.length];
+}
+
+/**
+ * Casts a minimal stub of drizzle's fluent select chain to its real type —
+ * the tests only exercise the `.from().where()` (and `.orderBy()`) calls the
+ * service actually makes.
+ */
+function asSelectChain(stub: object) {
+  return stub as unknown as ReturnType<typeof db.select>;
 }
 
 const LANG_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -33,7 +45,13 @@ const PHONEME_ID_1 = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 const PHONEME_ID_2 = 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 const GROUP_ID = 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 
-const mockUser = { id: 'ef000000-0000-0000-0000-000000000001' } as any;
+const mockUser: typeof users.$inferSelect = {
+  id: 'ef000000-0000-0000-0000-000000000001',
+  clerk_id: 'clerk-test',
+  email: 'test@example.com',
+};
+
+const mockLanguage = { id: LANG_ID, user_id: mockUser.id, name: 'Testlang' };
 
 // ---------------------------------------------------------------------------
 // selectRandomItemByWeight
@@ -158,29 +176,29 @@ describe('generateRandomWord', () => {
 
 describe('separateTemplateIds', () => {
   it('collects phoneme ids and leaves groupIds empty when all slots are phonemes', () => {
-    const structures = [
+    const structures: { template: SyllableStructure['template'] }[] = [
       { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }] },
       { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_2, optional: true }] },
-    ] as any;
+    ];
     const [phonemeIds, groupIds] = separateTemplateIds(structures);
     expect(phonemeIds).toEqual(new Set([PHONEME_ID_1, PHONEME_ID_2]));
     expect(groupIds.size).toBe(0);
   });
 
   it('collects group ids and leaves phonemeIds empty when all slots are groups', () => {
-    const structures = [
+    const structures: { template: SyllableStructure['template'] }[] = [
       { template: [{ kind: 'group', groupId: GROUP_ID, optional: false }] },
-    ] as any;
+    ];
     const [phonemeIds, groupIds] = separateTemplateIds(structures);
     expect(phonemeIds.size).toBe(0);
     expect(groupIds).toEqual(new Set([GROUP_ID]));
   });
 
   it('deduplicates ids that appear in multiple structures', () => {
-    const structures = [
+    const structures: { template: SyllableStructure['template'] }[] = [
       { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }] },
       { template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }] },
-    ] as any;
+    ];
     const [phonemeIds] = separateTemplateIds(structures);
     expect(phonemeIds.size).toBe(1);
   });
@@ -195,10 +213,10 @@ describe('builtLiteralTemplates', () => {
     const phonemesList = [
       { id: PHONEME_ID_1, symbol: 'k', ipa: 'k', weight: 2, language_id: LANG_ID },
     ];
-    const structures = [{
+    const structures: SyllableStructure[] = [{
       id: STRUCT_ID, language_id: LANG_ID, weight: 3,
       template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }],
-    }] as any;
+    }];
     const result = builtLiteralTemplates(phonemesList, [], structures);
     expect(result).toHaveLength(1);
     expect(result[0].weight).toBe(3);
@@ -214,10 +232,10 @@ describe('builtLiteralTemplates', () => {
         { group_id: GROUP_ID, phoneme_id: PHONEME_ID_2, phoneme: { id: PHONEME_ID_2, symbol: 'e', ipa: 'e', weight: 3, language_id: LANG_ID } },
       ],
     };
-    const structures = [{
+    const structures: SyllableStructure[] = [{
       id: STRUCT_ID, language_id: LANG_ID, weight: 1,
       template: [{ kind: 'group', groupId: GROUP_ID, optional: true }],
-    }] as any;
+    }];
     const result = builtLiteralTemplates([], [group], structures);
     expect(result[0].template[0].optional).toBe(true);
     expect(result[0].template[0].phonemes).toEqual(
@@ -274,9 +292,11 @@ describe('generateWordSvc', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     // Default: all select chains return empty arrays; tests override as needed
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
-    } as any);
+    vi.mocked(db.select).mockReturnValue(
+      asSelectChain({
+        from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
+      }),
+    );
   });
 
   it('returns a validation error for malformed input', async () => {
@@ -312,7 +332,7 @@ describe('generateWordSvc', () => {
   });
 
   it('returns not_found when no syllable structures match', async () => {
-    vi.mocked(db.query.languages.findFirst).mockResolvedValue({ id: LANG_ID } as any);
+    vi.mocked(db.query.languages.findFirst).mockResolvedValue(mockLanguage);
     // Default select mock returns [] → no structures found
     const result = await generateWordSvc(mockUser, LANG_ID, {
       wordsToGenerate: 5,
@@ -322,27 +342,34 @@ describe('generateWordSvc', () => {
   });
 
   it('returns a validation error when a phoneme group has no members', async () => {
-    vi.mocked(db.query.languages.findFirst).mockResolvedValue({ id: LANG_ID } as any);
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{
-          id: STRUCT_ID,
-          language_id: LANG_ID,
-          template: [{ kind: 'group', groupId: GROUP_ID, optional: false }],
-          weight: 1,
-        }]),
+    vi.mocked(db.query.languages.findFirst).mockResolvedValue(mockLanguage);
+    vi.mocked(db.select).mockReturnValue(
+      asSelectChain({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{
+            id: STRUCT_ID,
+            language_id: LANG_ID,
+            template: [{ kind: 'group', groupId: GROUP_ID, optional: false }],
+            weight: 1,
+          }]),
+        }),
       }),
-    } as any);
-    vi.mocked(db.query.phoneme_groups.findMany).mockResolvedValue([
-      { id: GROUP_ID, name: 'vowels', memberships: [] } as any,
-    ]);
+    );
+    const emptyGroup = {
+      id: GROUP_ID,
+      language_id: LANG_ID,
+      name: 'vowels',
+      memberships: [],
+    };
+    vi.mocked(db.query.phoneme_groups.findMany).mockResolvedValue([emptyGroup]);
 
     const result = await generateWordSvc(mockUser, LANG_ID, {
       wordsToGenerate: 5,
       structures: [STRUCT_ID],
     });
     expect(result).toMatchObject({ ok: false, kind: 'validation' });
-    expect((result as any).issues).toContain('vowels');
+    if (!result.ok && result.kind === 'validation')
+      expect(result.issues).toContain('vowels');
   });
 
   it('generates a deterministic word set given the same seed', async () => {
@@ -367,7 +394,7 @@ describe('generateWordSvc', () => {
     };
 
     function setupMocks() {
-      vi.mocked(db.query.languages.findFirst).mockResolvedValue({ id: LANG_ID } as any);
+      vi.mocked(db.query.languages.findFirst).mockResolvedValue(mockLanguage);
       vi.mocked(db.query.phoneme_groups.findMany).mockResolvedValue([]);
       // Select order: structures, then template phonemes, then the language's
       // rules — the last is awaited via .where(...).orderBy(...), so the
@@ -380,9 +407,9 @@ describe('generateWordSvc', () => {
             orderBy: vi.fn().mockResolvedValue([]),
           }),
         );
-      vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({ where: mockWhere }),
-      } as any);
+      vi.mocked(db.select).mockReturnValue(
+        asSelectChain({ from: vi.fn().mockReturnValue({ where: mockWhere }) }),
+      );
     }
 
     setupMocks();
