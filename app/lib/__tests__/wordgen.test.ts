@@ -74,41 +74,55 @@ describe('selectRandomItemByWeight', () => {
 // generateRandomSyllableStream
 // ---------------------------------------------------------------------------
 
+/** Joins a syllable/word of tokens back into its surface string. */
+function symbols(tokens: { symbol: string }[] | undefined): string {
+  return (tokens ?? []).map((t) => t.symbol).join('');
+}
+
 describe('generateRandomSyllableStream', () => {
   it('yields the sole phoneme from a single required slot', () => {
     const templates = [{
       weight: 1,
-      template: [{ phonemes: [{ symbol: 'k', ipa: null, weight: 1 }], optional: false }],
+      template: [{ phonemes: [{ id: PHONEME_ID_1, symbol: 'k', ipa: null, weight: 1 }], optional: false }],
     }];
     const gen = generateRandomSyllableStream(templates, seqRng([0]));
-    expect(gen.next().value).toBe('k');
-    expect(gen.next().value).toBe('k');
+    expect(symbols(gen.next().value)).toBe('k');
+    expect(symbols(gen.next().value)).toBe('k');
+  });
+
+  it('carries the phoneme id on each yielded token', () => {
+    const templates = [{
+      weight: 1,
+      template: [{ phonemes: [{ id: PHONEME_ID_1, symbol: 'k', ipa: null, weight: 1 }], optional: false }],
+    }];
+    const gen = generateRandomSyllableStream(templates, seqRng([0]));
+    expect(gen.next().value).toEqual([{ id: PHONEME_ID_1, symbol: 'k' }]);
   });
 
   it('skips an optional slot when rng returns < 0.5', () => {
     const templates = [{
       weight: 1,
       template: [
-        { phonemes: [{ symbol: 'a', ipa: null, weight: 1 }], optional: true },
-        { phonemes: [{ symbol: 'k', ipa: null, weight: 1 }], optional: false },
+        { phonemes: [{ id: PHONEME_ID_1, symbol: 'a', ipa: null, weight: 1 }], optional: true },
+        { phonemes: [{ id: PHONEME_ID_2, symbol: 'k', ipa: null, weight: 1 }], optional: false },
       ],
     }];
     // rng call order: template-select (0), optional-check (0.25 < 0.5 → skip), phoneme-select (0)
     const gen = generateRandomSyllableStream(templates, seqRng([0, 0.25, 0]));
-    expect(gen.next().value).toBe('k');
+    expect(symbols(gen.next().value)).toBe('k');
   });
 
   it('includes an optional slot when rng returns >= 0.5', () => {
     const templates = [{
       weight: 1,
       template: [
-        { phonemes: [{ symbol: 'a', ipa: null, weight: 1 }], optional: true },
-        { phonemes: [{ symbol: 'k', ipa: null, weight: 1 }], optional: false },
+        { phonemes: [{ id: PHONEME_ID_1, symbol: 'a', ipa: null, weight: 1 }], optional: true },
+        { phonemes: [{ id: PHONEME_ID_2, symbol: 'k', ipa: null, weight: 1 }], optional: false },
       ],
     }];
     // rng call order: template-select (0), optional-check (0.75 >= 0.5 → include), phoneme-selects (0, 0)
     const gen = generateRandomSyllableStream(templates, seqRng([0, 0.75, 0, 0]));
-    expect(gen.next().value).toBe('ak');
+    expect(symbols(gen.next().value)).toBe('ak');
   });
 });
 
@@ -116,18 +130,20 @@ describe('generateRandomSyllableStream', () => {
 // generateRandomWord
 // ---------------------------------------------------------------------------
 
-describe('generateRandomWord', () => {
-  function* repeatSyllable(s: string): Generator<string> {
-    while (true) yield s;
-  }
+/** Endless stream of the same syllable, given as one token per character. */
+function* repeatSyllable(s: string): Generator<{ id: string; symbol: string }[]> {
+  const syllable = [...s].map((symbol) => ({ id: `id-${symbol}`, symbol }));
+  while (true) yield syllable;
+}
 
+describe('generateRandomWord', () => {
   it('concatenates exactly the right number of syllables when min equals max', () => {
     const word = generateRandomWord(repeatSyllable('ka'), 2, 2, () => 0);
-    expect(word).toBe('kaka');
+    expect(symbols(word)).toBe('kaka');
   });
 
   it('produces a word with syllable count within [minSyllables, maxSyllables]', () => {
-    // Each syllable is 'x' so word.length equals syllable count
+    // Each syllable is one 'x' token so word.length equals syllable count
     for (const r of [0, 0.33, 0.66, 0.999]) {
       const word = generateRandomWord(repeatSyllable('x'), 2, 4, () => r);
       expect(word.length).toBeGreaterThanOrEqual(2);
@@ -187,7 +203,7 @@ describe('builtLiteralTemplates', () => {
     expect(result).toHaveLength(1);
     expect(result[0].weight).toBe(3);
     expect(result[0].template[0].optional).toBe(false);
-    expect(result[0].template[0].phonemes).toEqual([{ symbol: 'k', ipa: 'k', weight: 2 }]);
+    expect(result[0].template[0].phonemes).toEqual([{ id: PHONEME_ID_1, symbol: 'k', ipa: 'k', weight: 2 }]);
   });
 
   it('maps a group slot to all of its members', () => {
@@ -206,8 +222,8 @@ describe('builtLiteralTemplates', () => {
     expect(result[0].template[0].optional).toBe(true);
     expect(result[0].template[0].phonemes).toEqual(
       expect.arrayContaining([
-        { symbol: 'a', ipa: 'a', weight: 1 },
-        { symbol: 'e', ipa: 'e', weight: 3 },
+        { id: PHONEME_ID_1, symbol: 'a', ipa: 'a', weight: 1 },
+        { id: PHONEME_ID_2, symbol: 'e', ipa: 'e', weight: 3 },
       ]),
     );
   });
@@ -218,29 +234,35 @@ describe('builtLiteralTemplates', () => {
 // ---------------------------------------------------------------------------
 
 describe('generateWordSet', () => {
-  function* uniqueSyllables(): Generator<string> {
-    let n = 0;
-    while (true) yield `w${n++}`;
-  }
+  const identity = <T,>(w: T) => w;
 
-  function* repeatSyllable(s: string): Generator<string> {
-    while (true) yield s;
+  function* uniqueSyllables(): Generator<{ id: string; symbol: string }[]> {
+    let n = 0;
+    while (true) yield [{ id: `id-${n}`, symbol: `w${n++}` }];
   }
 
   it('returns the requested number of words when the phonological space is large enough', () => {
-    const words = generateWordSet(5, 1, 1, uniqueSyllables(), () => 0);
+    const words = generateWordSet(5, 1, 1, uniqueSyllables(), () => 0, identity);
     expect(words.size).toBe(5);
   });
 
   it('returns fewer than requested when the space is too constrained', () => {
     // Only one possible word exists: 'kaka' (fixed syllable, fixed 2-syllable count)
-    const words = generateWordSet(5, 2, 2, repeatSyllable('ka'), () => 0);
+    const words = generateWordSet(5, 2, 2, repeatSyllable('ka'), () => 0, identity);
     expect(words.size).toBe(1);
   });
 
   it('never returns duplicate words', () => {
-    const words = generateWordSet(10, 1, 1, uniqueSyllables(), () => 0);
+    const words = generateWordSet(10, 1, 1, uniqueSyllables(), () => 0, identity);
     expect(new Set([...words]).size).toBe(words.size);
+  });
+
+  it('dedupes on the post-transform surface form', () => {
+    // The transform rewrites every token to 'x', merging all raw words into one
+    const toX = (w: { id: string; symbol: string }[]) =>
+      w.map(() => ({ id: 'id-x', symbol: 'x' }));
+    const words = generateWordSet(5, 1, 1, uniqueSyllables(), () => 0, toX);
+    expect([...words]).toEqual(['x']);
   });
 });
 
@@ -347,10 +369,17 @@ describe('generateWordSvc', () => {
     function setupMocks() {
       vi.mocked(db.query.languages.findFirst).mockResolvedValue({ id: LANG_ID } as any);
       vi.mocked(db.query.phoneme_groups.findMany).mockResolvedValue([]);
-      // First select call returns structures; second returns phonemes
+      // Select order: structures, then template phonemes, then the language's
+      // rules — the last is awaited via .where(...).orderBy(...), so the
+      // default implementation returns a thenable that also carries orderBy.
       const mockWhere = vi.fn()
         .mockResolvedValueOnce([structure])
-        .mockResolvedValueOnce(phonemes);
+        .mockResolvedValueOnce(phonemes)
+        .mockImplementation(() =>
+          Object.assign(Promise.resolve([]), {
+            orderBy: vi.fn().mockResolvedValue([]),
+          }),
+        );
       vi.mocked(db.select).mockReturnValue({
         from: vi.fn().mockReturnValue({ where: mockWhere }),
       } as any);

@@ -1,7 +1,14 @@
 import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { phoneme_groups, phonemes, rules, users } from '../db/schema';
+import {
+  group_memberships,
+  phoneme_groups,
+  phonemes,
+  rules,
+  users,
+} from '../db/schema';
 import type { RuleContext } from '../db/json-shapes';
+import { compileRules, type CompiledRule } from './rule-apply';
 import {
   createRuleInputSchema,
   moveRuleInputSchema,
@@ -127,6 +134,65 @@ export async function isReferencedInRules(
     ) AS referenced`,
   );
   return Boolean(rows[0].referenced);
+}
+
+/**
+ * Loads a language's rules in application order and resolves them into
+ * {@link CompiledRule}s for word generation. Not a `Svc` function: it takes a
+ * trusted `languageId` from a service that already verified ownership
+ * (`generateWordSvc`), not raw client input.
+ *
+ * Only the **output** phonemes' symbols are fetched — targets and context
+ * phonemes are matched by id, and those ids cannot dangle because deleting a
+ * rule-referenced phoneme/group is blocked (`isReferencedInRules`). Groups
+ * resolve to their current member-id sets; a group emptied since the rule was
+ * written simply never matches (same tolerance as the phonotactics matcher).
+ */
+export async function loadCompiledRules(
+  languageId: string,
+): Promise<CompiledRule[]> {
+  const ruleRows = await db
+    .select()
+    .from(rules)
+    .where(eq(rules.language_id, languageId))
+    .orderBy(asc(rules.position), asc(rules.id));
+  if (ruleRows.length === 0) return [];
+
+  const outputIds = new Set<string>();
+  const groupIds = new Set<string>();
+  for (const rule of ruleRows) {
+    outputIds.add(rule.output_phoneme_id);
+    if (rule.target_group_id) groupIds.add(rule.target_group_id);
+    for (const slot of [...rule.left_context, ...rule.right_context]) {
+      if (slot.kind === 'group') groupIds.add(slot.groupId);
+    }
+  }
+
+  const [outputPhonemes, memberships] = await Promise.all([
+    db
+      .select({ id: phonemes.id, symbol: phonemes.symbol })
+      .from(phonemes)
+      .where(inArray(phonemes.id, [...outputIds])),
+    groupIds.size
+      ? db
+          .select({
+            group_id: group_memberships.group_id,
+            phoneme_id: group_memberships.phoneme_id,
+          })
+          .from(group_memberships)
+          .where(inArray(group_memberships.group_id, [...groupIds]))
+      : ([] as { group_id: string; phoneme_id: string }[]),
+  ]);
+
+  const phonemeSymbolById = new Map(outputPhonemes.map((p) => [p.id, p.symbol]));
+  const memberIdsByGroupId = new Map<string, Set<string>>();
+  for (const { group_id, phoneme_id } of memberships) {
+    let members = memberIdsByGroupId.get(group_id);
+    if (!members) memberIdsByGroupId.set(group_id, (members = new Set()));
+    members.add(phoneme_id);
+  }
+
+  return compileRules(ruleRows, phonemeSymbolById, memberIdsByGroupId);
 }
 
 /**

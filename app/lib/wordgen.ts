@@ -10,12 +10,15 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { notFound, validationMessage, type Result } from './result';
 import { parseInput } from './parse';
 import { parseAndRequireOwnedLanguage } from './ownership';
+import { applyRules, type WordToken } from './rule-apply';
+import { loadCompiledRules } from './rules';
 
 type DbUser = typeof users.$inferSelect;
 export type Rng = () => number;
 export type LiteralTemplate = {
   template: {
     phonemes: {
+      id: string;
       symbol: string;
       ipa: string | null;
       weight: number;
@@ -72,21 +75,26 @@ export function selectRandomItemByWeight<T extends { weight: number }>(
   return items[items.length - 1];
 }
 
+/**
+ * Yields syllables as {@link WordToken} arrays rather than joined strings so
+ * phoneme identity survives until rule application — a joined string cannot
+ * be re-tokenized unambiguously once multigraph symbols exist.
+ */
 export function* generateRandomSyllableStream(
   templates: LiteralTemplate[],
   rng: Rng,
-): Generator<string> {
+): Generator<WordToken[]> {
   while (true) {
     const selected = selectRandomItemByWeight(templates, rng);
 
-    let newSyllable = '';
+    const newSyllable: WordToken[] = [];
     // If all optional slots are skipped and the syllable ends up empty, re-attempt
     do
       for (let i = 0; i < selected.template.length; i++) {
         const slot = selected.template[i];
         if (slot.optional && rng() < 0.5) continue;
         const nextPhoneme = selectRandomItemByWeight(slot.phonemes, rng);
-        newSyllable += nextPhoneme.symbol;
+        newSyllable.push({ id: nextPhoneme.id, symbol: nextPhoneme.symbol });
       }
     while (newSyllable.length === 0);
 
@@ -94,16 +102,17 @@ export function* generateRandomSyllableStream(
   }
 }
 
+/** Draws a syllable count in [minSyllables, maxSyllables] and concatenates that many syllables' tokens. */
 export function generateRandomWord(
-  generator: Generator<string>,
+  generator: Generator<WordToken[]>,
   minSyllables: number,
   maxSyllables: number,
   rng: Rng,
-): string {
-  let word = '';
+): WordToken[] {
+  const word: WordToken[] = [];
   const syllableCount =
     Math.floor(rng() * (maxSyllables - minSyllables + 1)) + minSyllables;
-  for (let i = 0; i < syllableCount; i++) word += generator.next().value;
+  for (let i = 0; i < syllableCount; i++) word.push(...generator.next().value!);
   return word;
 }
 
@@ -137,7 +146,8 @@ export function builtLiteralTemplates(
           return {
             phonemes: groupsById
               .get(slot.groupId)!
-              .memberships.map(({ phoneme: { symbol, ipa, weight } }) => ({
+              .memberships.map(({ phoneme: { id, symbol, ipa, weight } }) => ({
+                id,
                 symbol,
                 ipa,
                 weight,
@@ -145,9 +155,9 @@ export function builtLiteralTemplates(
             optional: slot.optional,
           };
         else {
-          const { symbol, ipa, weight } = phonemesById.get(slot.phonemeId)!;
+          const { id, symbol, ipa, weight } = phonemesById.get(slot.phonemeId)!;
           return {
-            phonemes: [{ symbol, ipa, weight }],
+            phonemes: [{ id, symbol, ipa, weight }],
             optional: slot.optional,
           };
         }
@@ -208,19 +218,35 @@ export async function loadLiteralTemplates(
   };
 }
 
+/**
+ * Draws words from the syllable stream until `wordsToGenerate` unique surface
+ * forms exist (or the 10× attempt cap is hit). `transformWord` is the rule
+ * application step, run on the token array before it is joined to a string —
+ * so uniqueness is defined over **post-rule** surface forms (two raw words a
+ * rule merges count once). Pass the identity function when no rules apply.
+ */
 export function generateWordSet(
   wordsToGenerate: number,
   minSyllables: number,
   maxSyllables: number,
-  syllableStream: Generator<string>,
+  syllableStream: Generator<WordToken[]>,
   rng: Rng,
+  transformWord: (word: WordToken[]) => WordToken[],
 ) {
   const newWords = new Set<string>();
   const maxAttempts = wordsToGenerate * 10;
   let attempts = 0;
   while (newWords.size < wordsToGenerate && attempts < maxAttempts) {
+    const word = generateRandomWord(
+      syllableStream,
+      minSyllables,
+      maxSyllables,
+      rng,
+    );
     newWords.add(
-      generateRandomWord(syllableStream, minSyllables, maxSyllables, rng),
+      transformWord(word)
+        .map((t) => t.symbol)
+        .join(''),
     );
     attempts++;
   }
@@ -240,6 +266,10 @@ export function generateWordSet(
  *
  * Pass `seed` to make word generation deterministic — the same seed and language definition always
  * produce the same word list. Omit it for random output in production.
+ *
+ * All of the language's phonological rules are applied to every word (in `position` order,
+ * simultaneous application within a rule — see `applyRules`), so `data.words` contains
+ * post-rule surface forms and uniqueness is defined over those.
  */
 export async function generateWordSvc(
   user: DbUser,
@@ -281,6 +311,8 @@ export async function generateWordSvc(
       `Phoneme group "${emptyGroupNames[0]}" has no members and cannot be used in word generation.`,
     );
 
+  const compiledRules = await loadCompiledRules(lang.data.id);
+
   const rng = seed !== undefined ? makeRng(seed) : Math.random;
   const syllableStream = generateRandomSyllableStream(literalTemplates, rng);
 
@@ -290,6 +322,7 @@ export async function generateWordSvc(
     maxSyllables,
     syllableStream,
     rng,
+    (word) => applyRules(word, compiledRules),
   );
 
   return { ok: true, data: { words: newWords, requested: wordsToGenerate } };

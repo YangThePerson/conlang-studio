@@ -10,7 +10,13 @@ function tpl(
     weight: 1,
     template: slots.map((slot) => ({
       optional: slot.optional ?? false,
-      phonemes: slot.symbols.map((symbol) => ({ symbol, ipa: null, weight: 1 })),
+      phonemes: slot.symbols.map((symbol) => ({
+        // The matcher only reads symbols; a symbol-derived fake id keeps the type happy.
+        id: `id-${symbol}`,
+        symbol,
+        ipa: null,
+        weight: 1,
+      })),
     })),
   };
 }
