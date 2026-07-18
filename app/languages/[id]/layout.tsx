@@ -7,11 +7,9 @@ export default async function LanguageLayout({
   const { id } = await params;
 
   return (
-    <div className="flex flex-1">
+    <div className="flex h-[calc(100vh-4rem)]">
       <SideBar languageId={id} />
-      <div className="flex-1">
-        <main className="p-4 md:p-6 h-full">{children}</main>
-      </div>
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
     </div>
   );
 }
