@@ -151,8 +151,8 @@ describe('compilePhonotacticsMatcher', () => {
         {
           weight: 0,
           template: [
-            { optional: false, phonemes: [{ symbol: 't', ipa: null, weight: 0 }] },
-            { optional: false, phonemes: [{ symbol: 'a', ipa: null, weight: 0 }] },
+            { optional: false, phonemes: [{ id: 'id-t', symbol: 't', ipa: null, weight: 0 }] },
+            { optional: false, phonemes: [{ id: 'id-a', symbol: 'a', ipa: null, weight: 0 }] },
           ],
         },
       ]);

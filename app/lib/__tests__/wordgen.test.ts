@@ -49,9 +49,14 @@ const mockUser: typeof users.$inferSelect = {
   id: 'ef000000-0000-0000-0000-000000000001',
   clerk_id: 'clerk-test',
   email: 'test@example.com',
+  created_at: new Date(),
+  updated_at: new Date(),
 };
 
-const mockLanguage = { id: LANG_ID, user_id: mockUser.id, name: 'Testlang' };
+const mockLanguage = {
+  id: LANG_ID, user_id: mockUser.id, name: 'Testlang',
+  created_at: new Date(), updated_at: new Date(),
+};
 
 // ---------------------------------------------------------------------------
 // selectRandomItemByWeight
@@ -211,10 +216,10 @@ describe('separateTemplateIds', () => {
 describe('builtLiteralTemplates', () => {
   it('maps a phoneme slot to the phoneme symbol/ipa/weight', () => {
     const phonemesList = [
-      { id: PHONEME_ID_1, symbol: 'k', ipa: 'k', weight: 2, language_id: LANG_ID },
+      { id: PHONEME_ID_1, symbol: 'k', ipa: 'k', weight: 2, language_id: LANG_ID, created_at: new Date(), updated_at: new Date() },
     ];
     const structures: SyllableStructure[] = [{
-      id: STRUCT_ID, language_id: LANG_ID, weight: 3,
+      id: STRUCT_ID, language_id: LANG_ID, weight: 3, created_at: new Date(), updated_at: new Date(),
       template: [{ kind: 'phoneme', phonemeId: PHONEME_ID_1, optional: false }],
     }];
     const result = builtLiteralTemplates(phonemesList, [], structures);
@@ -233,7 +238,7 @@ describe('builtLiteralTemplates', () => {
       ],
     };
     const structures: SyllableStructure[] = [{
-      id: STRUCT_ID, language_id: LANG_ID, weight: 1,
+      id: STRUCT_ID, language_id: LANG_ID, weight: 1, created_at: new Date(), updated_at: new Date(),
       template: [{ kind: 'group', groupId: GROUP_ID, optional: true }],
     }];
     const result = builtLiteralTemplates([], [group], structures);
@@ -360,6 +365,8 @@ describe('generateWordSvc', () => {
       language_id: LANG_ID,
       name: 'vowels',
       memberships: [],
+      created_at: new Date(),
+      updated_at: new Date(),
     };
     vi.mocked(db.query.phoneme_groups.findMany).mockResolvedValue([emptyGroup]);
 
