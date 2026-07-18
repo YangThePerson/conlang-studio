@@ -7,6 +7,8 @@ per-language dictionary.
 
 Live at [conlang-app.vercel.app](https://conlang-app.vercel.app/).
 
+![Word generator producing candidate words from a syllable template](docs/screenshots/wordgen.png)
+
 ## Features
 
 - **Phonemes & groups** — build a language's sound inventory (symbol,
@@ -32,6 +34,12 @@ Live at [conlang-app.vercel.app](https://conlang-app.vercel.app/).
 Every feature above is exposed both through the app's UI and through a
 matching set of authenticated HTTP API routes under `/api/languages/[id]/...`
 (see [Architecture](#architecture)).
+
+### Screenshots
+
+|                              Rules editor                              |                              Dictionary                              |
+| :----------------------------------------------------------------------: | :----------------------------------------------------------------------: |
+| ![Sound-change rule editor with context slots and a live preview](docs/screenshots/rules-editor.png) | ![Dictionary entry expanded to show senses and tags](docs/screenshots/dictionary.png) |
 
 ## Tech stack
 
