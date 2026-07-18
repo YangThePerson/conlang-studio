@@ -259,7 +259,7 @@ function SyllableStructureForm({
                   type="button"
                   onClick={() => moveSlot(idx, -1)}
                   disabled={idx === 0}
-                  className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                  className="px-0.5 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                   aria-label="Move left"
                 >
                   ←
@@ -268,7 +268,7 @@ function SyllableStructureForm({
                   type="button"
                   onClick={() => moveSlot(idx, 1)}
                   disabled={idx === template.length - 1}
-                  className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                  className="px-0.5 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                   aria-label="Move right"
                 >
                   →
@@ -294,7 +294,7 @@ function SyllableStructureForm({
             <select
               value={newSelection}
               onChange={(e) => setNewSelection(e.target.value)}
-              className="border rounded p-3 text-sm bg-gray-800"
+              className="border rounded p-3 text-sm bg-card"
             >
               {groups.length > 0 && (
                 <optgroup label="Groups">

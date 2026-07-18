@@ -192,7 +192,7 @@ function RuleRow({
               type="submit"
               disabled={isFirst || busy}
               aria-label="Move rule up"
-              className="px-1 text-muted-foreground enabled:hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+              className="px-1 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
             >
               ▲
             </button>
@@ -202,7 +202,7 @@ function RuleRow({
               type="submit"
               disabled={isLast || busy}
               aria-label="Move rule down"
-              className="px-1 text-muted-foreground enabled:hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+              className="px-1 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
             >
               ▼
             </button>
@@ -319,7 +319,7 @@ function ContextEditor({
                 type="button"
                 onClick={() => moveSlot(idx, -1)}
                 disabled={idx === 0}
-                className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                className="px-0.5 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                 aria-label="Move slot left"
               >
                 ←
@@ -328,7 +328,7 @@ function ContextEditor({
                 type="button"
                 onClick={() => moveSlot(idx, 1)}
                 disabled={idx === context.length - 1}
-                className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                className="px-0.5 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                 aria-label="Move slot right"
               >
                 →
@@ -352,7 +352,7 @@ function ContextEditor({
           value={newSelection}
           onChange={(e) => setNewSelection(e.target.value)}
           aria-label={`Add slot to ${label.toLowerCase()}`}
-          className="border rounded p-2 text-sm bg-gray-800"
+          className="border rounded p-2 text-sm bg-card"
         >
           <option value="boundary"># Word boundary</option>
           {groups.length > 0 && (
@@ -517,7 +517,7 @@ function RuleForm({
           value={targetId}
           onChange={(e) => setTargetId(e.target.value)}
           aria-label="Target"
-          className="border rounded p-2 text-sm bg-gray-800"
+          className="border rounded p-2 text-sm bg-card"
         >
           {targetOptions.map((t) => (
             <option key={t.id} value={t.id}>
@@ -532,7 +532,7 @@ function RuleForm({
           value={outputId}
           onChange={(e) => setOutputId(e.target.value)}
           aria-label="Output phoneme"
-          className="border rounded p-2 text-sm bg-gray-800"
+          className="border rounded p-2 text-sm bg-card"
         >
           {phonemes.map((p) => (
             <option key={p.id} value={p.id}>
