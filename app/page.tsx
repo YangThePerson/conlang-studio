@@ -22,8 +22,7 @@ const FEATURES: { label: string; description: string }[] = [
   },
   {
     label: 'Dictionary',
-    description:
-      'Track vocabulary with definitions, tags, and word origins.',
+    description: 'Track vocabulary with definitions, tags, and word origins.',
   },
   {
     label: 'Word Generator',
@@ -49,8 +48,8 @@ export default async function Home() {
           </h1>
           <p className="text-muted-foreground max-w-xl">
             Conlang Studio takes you from a phoneme inventory to generated
-            vocabulary — define sounds, syllable shapes, and sound-change
-            rules, then generate words that follow them.
+            vocabulary. Define sounds, syllable shapes, and sound-change rules,
+            then generate words that follow them.
           </p>
 
           {user ? (
