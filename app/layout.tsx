@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Noto_Sans_Mono } from 'next/font/google';
 import Link from 'next/link';
 import './globals.css';
 import {
@@ -20,6 +20,12 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const notoSansMono = Noto_Sans_Mono({
+  variable: '--font-noto-sans-mono',
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '700'],
+});
+
 export const metadata: Metadata = {
   title: 'Conlang Studio',
   description: 'Design constructed languages, end to end.',
@@ -33,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoSansMono.variable} antialiased flex flex-col min-h-screen`}
       >
         <ClerkProvider>
           <header className="flex justify-between items-center p-4 gap-4 h-16 bg-gray-900 text-white">
