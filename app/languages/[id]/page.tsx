@@ -55,14 +55,14 @@ export default async function LanguagePage({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{language.name}</h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-400">
           Last activity: {formatRelativeTime(stats.lastActivityAt)}
         </p>
       </div>
 
       {stats.phonemeCount === 0 ? (
-        <div className="rounded border border-dashed border-gray-300 p-8 text-center">
-          <p className="text-gray-600 mb-4">
+        <div className="rounded border border-dashed border-gray-600 p-8 text-center">
+          <p className="text-gray-400 mb-4">
             This language doesn&apos;t have any phonemes yet. Phonemes are the
             building blocks everything else — syllable structures, rules, and
             word generation — depends on.
@@ -80,10 +80,12 @@ export default async function LanguagePage({
             <Link
               key={label}
               href={`/languages/${id}${href}`}
-              className="rounded border p-4 hover:bg-gray-50 transition-colors"
+              className="rounded border p-4 hover:bg-gray-800 transition-colors"
             >
-              <p className="text-3xl font-semibold">{stats[key]}</p>
-              <p className="text-sm text-gray-600">{label}</p>
+              <p className="text-3xl text-gray-500 font-semibold">
+                {stats[key]}
+              </p>
+              <p className="text-sm text-gray-400">{label}</p>
             </Link>
           ))}
         </div>
@@ -107,7 +109,7 @@ export default async function LanguagePage({
                 className="flex items-baseline justify-between p-3"
               >
                 <span className="font-medium">{lexeme.term}</span>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-400">
                   {formatRelativeTime(lexeme.created_at)}
                 </span>
               </li>

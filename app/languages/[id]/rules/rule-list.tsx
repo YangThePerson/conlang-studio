@@ -315,7 +315,7 @@ function ContextEditor({
                 type="button"
                 onClick={() => moveSlot(idx, -1)}
                 disabled={idx === 0}
-                className="px-0.5 text-gray-400 enabled:hover:text-gray-700 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                 aria-label="Move slot left"
               >
                 ←
@@ -324,7 +324,7 @@ function ContextEditor({
                 type="button"
                 onClick={() => moveSlot(idx, 1)}
                 disabled={idx === context.length - 1}
-                className="px-0.5 text-gray-400 enabled:hover:text-gray-700 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                 aria-label="Move slot right"
               >
                 →
@@ -619,7 +619,7 @@ export default function RuleList({
         groupNameById={groupNameById}
       />
       {rules.length === 0 ? (
-        <p className="text-gray-500">
+        <p className="text-gray-400">
           No rules yet. Rules rewrite one sound into another when its
           neighbors match — add one above.
         </p>

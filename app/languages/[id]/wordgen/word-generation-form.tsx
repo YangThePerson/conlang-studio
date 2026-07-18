@@ -74,7 +74,7 @@ function WordGenControls({
   if (!structures.length)
     return (
       <div className="flex-1 py-4 px-16 flex flex-col justify-center items-center gap-4">
-        <p className="text-gray-500">No syllable structures yet.</p>
+        <p className="text-gray-400">No syllable structures yet.</p>
         <button
           role="link"
           onClick={() => redirect(`/languages/${languageId}/syllables`)}
@@ -164,14 +164,14 @@ function WordPanel({
   if (!words.length)
     return (
       <div className="flex-2 py-4 px-16 border rounded flex flex-col justify-center items-center gap-4">
-        <p className="text-gray-500">No words have been generated yet.</p>
+        <p className="text-gray-400">No words have been generated yet.</p>
       </div>
     );
 
   if (generationPending)
     return (
       <div className="flex-2 py-4 px-16 border rounded flex flex-col justify-center items-center gap-4">
-        <p className="text-gray-500">Generating words...</p>
+        <p className="text-gray-400">Generating words...</p>
       </div>
     );
 
@@ -189,7 +189,7 @@ function WordPanel({
           const added = addedWords.has(word);
           return (
             <li
-              className={`flex flex-1 items-center justify-between hover:bg-zinc-900`}
+              className={`flex flex-1 items-center justify-between hover:bg-gray-800`}
               key={i}
             >
               <span className="ml-12">{word}</span>

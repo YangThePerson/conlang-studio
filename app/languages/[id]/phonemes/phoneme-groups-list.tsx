@@ -216,7 +216,7 @@ export default function PhonemeGroupsList({
     <div>
       <AddGroupForm languageId={languageId} />
       {initialGroups.length === 0 ? (
-        <p className="text-gray-500">No phoneme groups yet. Add one above.</p>
+        <p className="text-gray-400">No phoneme groups yet. Add one above.</p>
       ) : (
         <ul className="space-y-2">
           {[...initialGroups]

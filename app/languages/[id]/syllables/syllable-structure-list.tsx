@@ -255,7 +255,7 @@ function SyllableStructureForm({
                   type="button"
                   onClick={() => moveSlot(idx, -1)}
                   disabled={idx === 0}
-                  className="px-0.5 text-gray-400 enabled:hover:text-gray-700 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                  className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                   aria-label="Move left"
                 >
                   ←
@@ -264,7 +264,7 @@ function SyllableStructureForm({
                   type="button"
                   onClick={() => moveSlot(idx, 1)}
                   disabled={idx === template.length - 1}
-                  className="px-0.5 text-gray-400 enabled:hover:text-gray-700 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                  className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                   aria-label="Move right"
                 >
                   →
@@ -397,7 +397,7 @@ export default function SyllableStructureList({
         groups={groups}
       />
       {initialStructures.length === 0 ? (
-        <p className="text-gray-500">
+        <p className="text-gray-400">
           No syllable structures yet. Add one above.
         </p>
       ) : (

@@ -330,7 +330,7 @@ function AttachTagForm({
 
   if (availableTags.length === 0)
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-400">
         No more tags to add — create one in Manage tags above.
       </p>
     );
@@ -587,7 +587,7 @@ function LexemeEntry({
             <td className="py-2">{firstSense.definition}</td>
           </>
         ) : (
-          <td colSpan={2} className="py-2 text-gray-500 italic">
+          <td colSpan={2} className="py-2 text-gray-400 italic">
             No senses yet
           </td>
         )}
@@ -881,7 +881,7 @@ export default function DictionaryTable({
       <AddLexemeForm languageId={languageId} />
       <TagManager languageId={languageId} tags={allTags} />
       {dictionary.length === 0 ? (
-        <p className="text-gray-500">
+        <p className="text-gray-400">
           No words yet — add one above, or bank some from the word generator.
         </p>
       ) : (
@@ -900,13 +900,13 @@ export default function DictionaryTable({
             setSort={setSort}
           />
           {visible.length === 0 ? (
-            <p className="text-gray-500">
+            <p className="text-gray-400">
               No entries match the current filters.
             </p>
           ) : (
             <>
               {visible.length < dictionary.length && (
-                <p className="text-gray-500 text-sm">
+                <p className="text-gray-400 text-sm">
                   Showing {visible.length} of {dictionary.length}{' '}
                   {dictionary.length === 1 ? 'entry' : 'entries'}
                 </p>

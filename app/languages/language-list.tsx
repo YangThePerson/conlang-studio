@@ -59,7 +59,7 @@ function LanguageItem({ lang }: { lang: Language }) {
           type="button"
           disabled={isEditing}
           onClick={startEdit}
-          className="text-slate-500 enabled:hover:text-slate-700 text-sm px-2 py-1 disabled:opacity-50 cursor-pointer"
+          className="text-gray-400 enabled:hover:text-gray-200 text-sm px-2 py-1 disabled:opacity-50 cursor-pointer"
         >
           Rename
         </button>
@@ -118,7 +118,7 @@ export default function LanguageList({
       </form>
 
       {langs.length === 0 ? (
-        <p className="text-gray-500">No languages yet. Create one above.</p>
+        <p className="text-gray-400">No languages yet. Create one above.</p>
       ) : (
         <ul className="space-y-2">
           {langs.map((lang) => (

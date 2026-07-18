@@ -45,7 +45,7 @@ export default async function Home() {
           <h1 className="text-4xl font-bold">
             Design constructed languages, end to end.
           </h1>
-          <p className="text-gray-600 max-w-xl">
+          <p className="text-gray-400 max-w-xl">
             Conlang Studio takes you from a phoneme inventory to generated
             vocabulary — define sounds, syllable shapes, and sound-change
             rules, then generate words that follow them.
@@ -66,7 +66,7 @@ export default async function Home() {
                 </button>
               </SignUpButton>
               <SignInButton>
-                <button className="border border-gray-300 px-6 py-3 rounded font-medium cursor-pointer">
+                <button className="border border-gray-600 px-6 py-3 rounded font-medium cursor-pointer">
                   Sign in
                 </button>
               </SignInButton>
@@ -78,7 +78,7 @@ export default async function Home() {
           {FEATURES.map(({ label, description }) => (
             <div key={label} className="rounded border p-4">
               <p className="font-semibold">{label}</p>
-              <p className="text-sm text-gray-600">{description}</p>
+              <p className="text-sm text-gray-400">{description}</p>
             </div>
           ))}
         </div>
