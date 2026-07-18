@@ -7,6 +7,8 @@ import { formatRule, formatSlot } from '@/app/lib/rule-notation';
 import { useActionState, useMemo, useState } from 'react';
 import { createRule, deleteRule, moveRule, updateRule } from './actions';
 import { failureMessage, type ActionState } from '../dictionary/action-state';
+import { Button } from '@/app/components/ui/button';
+import { Label } from '@/app/components/ui/label';
 
 type Phoneme = typeof phonemesTable.$inferSelect;
 type Rule = typeof rulesTable.$inferSelect;
@@ -69,7 +71,7 @@ function AddRuleForm({
 
   if (phonemes.length === 0)
     return (
-      <p className="mb-6 text-sm text-gray-400">
+      <p className="mb-6 text-sm text-muted-foreground">
         Add phonemes to this language before writing rules.
       </p>
     );
@@ -94,14 +96,14 @@ function AddRuleForm({
           groupNameById={groupNameById}
         />
       ) : (
-        <button
+        <Button
           type="button"
           disabled={pending}
           onClick={() => setIsAdding(true)}
-          className="w-60 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-60"
         >
           Add Rule
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -182,7 +184,7 @@ function RuleRow({
     );
 
   return (
-    <li className="flex items-center gap-2 p-3 border rounded justify-between">
+    <li className="flex items-center gap-2 rounded-lg border bg-card p-3 justify-between">
       <div className="flex items-center gap-3 mx-3 w-full">
         <div className="flex flex-col">
           <form action={moveUpAction}>
@@ -190,7 +192,7 @@ function RuleRow({
               type="submit"
               disabled={isFirst || busy}
               aria-label="Move rule up"
-              className="px-1 text-gray-400 enabled:hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+              className="px-1 text-muted-foreground enabled:hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-auto"
             >
               ▲
             </button>
@@ -200,7 +202,7 @@ function RuleRow({
               type="submit"
               disabled={isLast || busy}
               aria-label="Move rule down"
-              className="px-1 text-gray-400 enabled:hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+              className="px-1 text-muted-foreground enabled:hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-auto"
             >
               ▼
             </button>
@@ -214,22 +216,24 @@ function RuleRow({
         )}
       </div>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="edit"
           onClick={() => setIsEditing(true)}
           disabled={busy}
-          className="w-32 bg-violet-900 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-32"
         >
           Edit
-        </button>
+        </Button>
         <form action={deleteAction}>
-          <button
+          <Button
             type="submit"
+            variant="destructive"
             disabled={busy}
-            className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+            className="w-32"
           >
             Delete
-          </button>
+          </Button>
         </form>
       </div>
     </li>
@@ -295,27 +299,27 @@ function ContextEditor({
   }
 
   return (
-    <fieldset className="w-full border rounded p-3">
-      <legend className="px-1 text-sm text-gray-300">{label}</legend>
+    <fieldset className="w-full rounded-lg border p-3">
+      <legend className="px-1 text-sm text-muted-foreground">{label}</legend>
 
       {/* Slot chips */}
       <div className="flex flex-wrap gap-1 min-h-8 items-center w-full py-2">
         {context.length === 0 ? (
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-muted-foreground">
             Empty — no restriction on this side.
           </span>
         ) : (
           context.map((slot, idx) => (
             <div
               key={idx}
-              className="flex items-center gap-0.5 bg-gray-950 border rounded p-3 text-sm font-mono"
+              className="flex items-center gap-0.5 bg-muted border rounded-md p-3 text-sm font-mono"
             >
               <span>{formatSlot(slot, phonemeSymbolById, groupNameById)}</span>
               <button
                 type="button"
                 onClick={() => moveSlot(idx, -1)}
                 disabled={idx === 0}
-                className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                 aria-label="Move slot left"
               >
                 ←
@@ -324,7 +328,7 @@ function ContextEditor({
                 type="button"
                 onClick={() => moveSlot(idx, 1)}
                 disabled={idx === context.length - 1}
-                className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                 aria-label="Move slot right"
               >
                 →
@@ -332,7 +336,7 @@ function ContextEditor({
               <button
                 type="button"
                 onClick={() => removeSlot(idx)}
-                className="px-0.5 text-gray-400 hover:text-red-600 cursor-pointer"
+                className="px-0.5 text-muted-foreground hover:text-red-600 cursor-pointer"
                 aria-label="Remove slot"
               >
                 ×
@@ -370,22 +374,24 @@ function ContextEditor({
             </optgroup>
           )}
         </select>
-        <label className="flex items-center gap-1 text-sm">
+        <Label className="gap-1 font-normal">
           <input
             type="checkbox"
             checked={newOptional}
             disabled={newSelection === 'boundary'}
             onChange={(e) => setNewOptional(e.target.checked)}
+            className="accent-teal-600"
           />
           Optional
-        </label>
-        <button
+        </Label>
+        <Button
           type="button"
+          variant="secondary"
           onClick={addSlot}
-          className="w-32 bg-gray-600 text-white px-4 py-2 rounded cursor-pointer"
+          className="w-32"
         >
           + Add slot
-        </button>
+        </Button>
       </div>
     </fieldset>
   );
@@ -467,7 +473,7 @@ function RuleForm({
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 p-5 border rounded mb-3"
+      className="flex flex-col gap-4 rounded-lg border bg-card p-5 mb-3"
     >
       <input
         type="hidden"
@@ -482,18 +488,19 @@ function RuleForm({
 
       {/* Target */}
       <div className="flex flex-wrap items-center gap-4">
-        <span className="text-sm text-gray-300">Target:</span>
-        <label className="flex items-center gap-1 text-sm">
+        <span className="text-sm text-muted-foreground">Target:</span>
+        <Label className="gap-1 font-normal">
           <input
             type="radio"
             name="target_kind"
             value="phoneme"
             checked={targetKind === 'phoneme'}
             onChange={() => switchTargetKind('phoneme')}
+            className="accent-teal-600"
           />
           Phoneme
-        </label>
-        <label className="flex items-center gap-1 text-sm">
+        </Label>
+        <Label className="gap-1 font-normal">
           <input
             type="radio"
             name="target_kind"
@@ -501,9 +508,10 @@ function RuleForm({
             checked={targetKind === 'group'}
             onChange={() => switchTargetKind('group')}
             disabled={groups.length === 0}
+            className="accent-teal-600"
           />
           Group
-        </label>
+        </Label>
         <select
           name="target_id"
           value={targetId}
@@ -518,7 +526,7 @@ function RuleForm({
           ))}
         </select>
 
-        <span className="text-sm text-gray-300">becomes</span>
+        <span className="text-sm text-muted-foreground">becomes</span>
         <select
           name="output_phoneme_id"
           value={outputId}
@@ -563,21 +571,22 @@ function RuleForm({
 
       {/* Commit or cancel */}
       <div className="flex flex-row gap-2 self-end">
-        <button
+        <Button
           type="submit"
           disabled={pending || !targetId || !outputId}
-          className="w-32 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 enabled:cursor-pointer"
+          className="w-32"
         >
           {mode === 'Add' ? 'Add' : 'Save'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="secondary"
           onClick={cancel}
           disabled={pending}
-          className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer"
+          className="w-32"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -619,7 +628,7 @@ export default function RuleList({
         groupNameById={groupNameById}
       />
       {rules.length === 0 ? (
-        <p className="text-gray-400">
+        <p className="text-muted-foreground">
           No rules yet. Rules rewrite one sound into another when its
           neighbors match — add one above.
         </p>

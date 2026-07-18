@@ -4,6 +4,7 @@ import { formatRelativeTime } from '@/app/lib/relative-time';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { LanguageOverview } from '@/app/lib/languages';
+import { Button } from '@/app/components/ui/button';
 
 /** Keys of the numeric count fields in {@link LanguageOverview} — the ones rendered as stat cards. */
 type StatKey = {
@@ -55,24 +56,23 @@ export default async function LanguagePage({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{language.name}</h1>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-muted-foreground">
           Last activity: {formatRelativeTime(stats.lastActivityAt)}
         </p>
       </div>
 
       {stats.phonemeCount === 0 ? (
-        <div className="rounded border border-dashed border-gray-600 p-8 text-center">
-          <p className="text-gray-400 mb-4">
+        <div className="rounded-lg border border-dashed p-8 text-center">
+          <p className="text-muted-foreground mb-4">
             This language doesn&apos;t have any phonemes yet. Phonemes are the
             building blocks everything else — syllable structures, rules, and
             word generation — depends on.
           </p>
-          <Link
-            href={`/languages/${id}/phonemes`}
-            className="inline-block bg-teal-700 text-white px-4 py-2 rounded"
-          >
-            Add your first phoneme
-          </Link>
+          <Button asChild>
+            <Link href={`/languages/${id}/phonemes`}>
+              Add your first phoneme
+            </Link>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -80,12 +80,10 @@ export default async function LanguagePage({
             <Link
               key={label}
               href={`/languages/${id}${href}`}
-              className="rounded border p-4 hover:bg-gray-800 transition-colors"
+              className="rounded-xl border bg-card text-card-foreground p-4 hover:bg-accent transition-colors"
             >
-              <p className="text-3xl text-gray-500 font-semibold">
-                {stats[key]}
-              </p>
-              <p className="text-sm text-gray-400">{label}</p>
+              <p className="text-3xl font-semibold">{stats[key]}</p>
+              <p className="text-sm text-muted-foreground">{label}</p>
             </Link>
           ))}
         </div>
@@ -97,19 +95,19 @@ export default async function LanguagePage({
             <h2 className="text-lg font-semibold">Recently added words</h2>
             <Link
               href={`/languages/${id}/dictionary`}
-              className="text-sm text-teal-700 hover:underline"
+              className="text-sm text-teal-400 hover:underline"
             >
               View dictionary
             </Link>
           </div>
-          <ul className="divide-y rounded border">
+          <ul className="divide-y rounded-lg border bg-card">
             {stats.recentLexemes.map((lexeme) => (
               <li
                 key={lexeme.id}
                 className="flex items-baseline justify-between p-3"
               >
-                <span className="font-medium">{lexeme.term}</span>
-                <span className="text-sm text-gray-400">
+                <span className="font-medium font-mono">{lexeme.term}</span>
+                <span className="text-sm text-muted-foreground">
                   {formatRelativeTime(lexeme.created_at)}
                 </span>
               </li>

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { SignInButton, SignUpButton } from '@clerk/nextjs';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { Button } from '@/app/components/ui/button';
+import { Card, CardDescription, CardTitle } from '@/app/components/ui/card';
 
 const FEATURES: { label: string; description: string }[] = [
   {
@@ -45,30 +47,25 @@ export default async function Home() {
           <h1 className="text-4xl font-bold">
             Design constructed languages, end to end.
           </h1>
-          <p className="text-gray-400 max-w-xl">
+          <p className="text-muted-foreground max-w-xl">
             Conlang Studio takes you from a phoneme inventory to generated
             vocabulary — define sounds, syllable shapes, and sound-change
             rules, then generate words that follow them.
           </p>
 
           {user ? (
-            <Link
-              href="/languages"
-              className="bg-teal-700 text-white px-6 py-3 rounded font-medium"
-            >
-              Go to your languages
-            </Link>
+            <Button asChild size="lg">
+              <Link href="/languages">Go to your languages</Link>
+            </Button>
           ) : (
             <div className="flex gap-3">
               <SignUpButton>
-                <button className="bg-teal-700 text-white px-6 py-3 rounded font-medium cursor-pointer">
-                  Get started
-                </button>
+                <Button size="lg">Get started</Button>
               </SignUpButton>
               <SignInButton>
-                <button className="border border-gray-600 px-6 py-3 rounded font-medium cursor-pointer">
+                <Button size="lg" variant="outline">
                   Sign in
-                </button>
+                </Button>
               </SignInButton>
             </div>
           )}
@@ -76,10 +73,10 @@ export default async function Home() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
           {FEATURES.map(({ label, description }) => (
-            <div key={label} className="rounded border p-4">
-              <p className="font-semibold">{label}</p>
-              <p className="text-sm text-gray-400">{description}</p>
-            </div>
+            <Card key={label} className="p-4 gap-1">
+              <CardTitle>{label}</CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </Card>
           ))}
         </div>
       </main>

@@ -4,6 +4,8 @@ import { useActionState, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { createLanguage, updateLanguage, deleteLanguage } from './actions';
 import type { languages } from '@/app/db/schema';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
 
 type Language = typeof languages.$inferSelect;
 
@@ -33,9 +35,9 @@ function LanguageItem({ lang }: { lang: Language }) {
   }
 
   return (
-    <li className="flex items-center gap-2 p-3 border rounded">
+    <li className="flex items-center gap-2 rounded-lg border bg-card p-3">
       {isEditing ? (
-        <input
+        <Input
           autoFocus
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
@@ -44,7 +46,7 @@ function LanguageItem({ lang }: { lang: Language }) {
             if (e.key === 'Escape') setIsEditing(false);
           }}
           onBlur={commitRename}
-          className="flex-1 border rounded px-2 py-1"
+          className="flex-1 h-8"
         />
       ) : (
         <Link
@@ -55,21 +57,25 @@ function LanguageItem({ lang }: { lang: Language }) {
         </Link>
       )}
       <form action={deleteAction}>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           disabled={isEditing}
           onClick={startEdit}
-          className="text-gray-400 enabled:hover:text-gray-200 text-sm px-2 py-1 disabled:opacity-50 cursor-pointer"
+          className="text-muted-foreground"
         >
           Rename
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
+          variant="ghost"
+          size="sm"
           disabled={deletePending}
-          className="text-red-500 hover:text-red-700 text-sm px-2 py-1 disabled:opacity-50 cursor-pointer"
+          className="text-red-400 hover:text-red-300"
         >
           Delete
-        </button>
+        </Button>
       </form>
     </li>
   );
@@ -94,19 +100,15 @@ export default function LanguageList({
     <div>
       <form action={createAction} className="flex flex-col gap-2 mb-6">
         <div className="flex gap-2">
-          <input
+          <Input
             name="name"
             placeholder="New language name"
             required
-            className="flex-1 border rounded px-3 py-2"
+            className="flex-1"
           />
-          <button
-            type="submit"
-            disabled={createPending}
-            className="bg-teal-700 text-white px-4 py-2 rounded disabled:opacity-50 cursor-pointer"
-          >
+          <Button type="submit" disabled={createPending}>
             Create
-          </button>
+          </Button>
         </div>
         {createState && !createState.ok && (
           <p className="text-red-500 text-sm">
@@ -118,7 +120,7 @@ export default function LanguageList({
       </form>
 
       {langs.length === 0 ? (
-        <p className="text-gray-400">No languages yet. Create one above.</p>
+        <p className="text-muted-foreground">No languages yet. Create one above.</p>
       ) : (
         <ul className="space-y-2">
           {langs.map((lang) => (

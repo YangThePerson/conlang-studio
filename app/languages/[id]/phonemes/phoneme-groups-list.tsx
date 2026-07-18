@@ -4,6 +4,9 @@ import { phonemes } from '@/app/db/schema';
 import { PhonemeGroupWithMembers } from '@/app/lib/phoneme-groups';
 import { useActionState, useState } from 'react';
 import { createGroup, deleteGroup, updateGroup } from './actions';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
 
 type Phoneme = typeof phonemes.$inferSelect;
 
@@ -20,22 +23,18 @@ function AddGroupForm({ languageId }: { languageId: string }) {
   return (
     <form action={createAction} className="flex flex-col gap-2 mb-6">
       <div className="flex items-center gap-2 px-2">
-        <input
+        <Input
           name="name"
           placeholder="New Group"
           required
-          className="flex-1 border rounded p-3 font-mono text-lg"
+          className="flex-1 font-mono text-lg"
         />
-        <button
-          type="submit"
-          disabled={createPending}
-          className="w-32 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
-        >
+        <Button type="submit" disabled={createPending} className="w-32">
           Add
-        </button>
+        </Button>
       </div>
       {createState && !createState.ok && (
-        <p className="text-red-500 text-sm">
+        <p className="text-red-400 text-sm">
           {createState.kind === 'validation'
             ? 'Invalid input — please check the form.'
             : 'Something went wrong. Please try again.'}
@@ -69,13 +68,13 @@ function EditGroupForm({
         <input key={m.id} type="hidden" name="current_member_id" value={m.id} />
       ))}
       <div className="flex flex-col gap-2">
-        <input
+        <Input
           name="name"
           placeholder="Name *"
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
           required
-          className="w-80 border rounded p-3 font-mono text-lg text-center"
+          className="w-80 font-mono text-lg text-center"
         />
         <section className="grid grid-cols-6">
           {phonemes.map((p, i) => {
@@ -88,30 +87,28 @@ function EditGroupForm({
                   name="phoneme_id"
                   value={p.id}
                   defaultChecked={group.members.some((m) => m.id === p.id)}
+                  className="accent-teal-600"
                 />
-                <label className="w-full" htmlFor={`phn-${i}`}>
+                <Label className="w-full font-normal" htmlFor={`phn-${i}`}>
                   {formattedName}
-                </label>
+                </Label>
               </div>
             );
           })}
         </section>
       </div>
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-32 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
-        >
+        <Button type="submit" disabled={pending} className="w-32">
           Save
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="secondary"
           onClick={cancel}
-          className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer"
+          className="w-32"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -149,7 +146,7 @@ function GroupRow({
 
   if (isEditing) {
     return (
-      <li className="flex flex-row items-center gap-2 p-3 border rounded">
+      <li className="flex flex-row items-center gap-2 rounded-lg border bg-card p-3">
         <EditGroupForm
           formAction={editAction}
           pending={editPending}
@@ -158,7 +155,7 @@ function GroupRow({
           group={group}
         />
         {editState && !editState.ok && (
-          <p className="text-red-500 text-sm">
+          <p className="text-red-400 text-sm">
             {editState.kind === 'validation'
               ? 'Invalid input — check name.'
               : 'Something went wrong. Please try again.'}
@@ -169,7 +166,7 @@ function GroupRow({
   }
 
   return (
-    <li className="flex flex-row items-center gap-2 p-3 border rounded">
+    <li className="flex flex-row items-center gap-2 rounded-lg border bg-card p-3">
       <div className="flex-1 flex flex-row">
         <p className="w-1/4">
           <strong>Name: </strong>
@@ -182,22 +179,24 @@ function GroupRow({
             : 'None'}
         </p>
       </div>
-      <button
+      <Button
         type="button"
+        variant="edit"
         disabled={deletePending}
         onClick={() => setIsEditing(true)}
-        className="w-32 bg-violet-900 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+        className="w-32"
       >
         Edit
-      </button>
+      </Button>
       <form action={deleteAction}>
-        <button
+        <Button
           type="submit"
+          variant="destructive"
           disabled={deletePending}
-          className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-32"
         >
           Delete
-        </button>
+        </Button>
       </form>
     </li>
   );
@@ -216,7 +215,9 @@ export default function PhonemeGroupsList({
     <div>
       <AddGroupForm languageId={languageId} />
       {initialGroups.length === 0 ? (
-        <p className="text-gray-400">No phoneme groups yet. Add one above.</p>
+        <p className="text-muted-foreground">
+          No phoneme groups yet. Add one above.
+        </p>
       ) : (
         <ul className="space-y-2">
           {[...initialGroups]

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Noto_Sans_Mono } from 'next/font/google';
 import Link from 'next/link';
 import './globals.css';
+import { Button } from '@/app/components/ui/button';
 import {
   ClerkProvider,
   Show,
@@ -37,12 +38,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansMono.variable} antialiased flex flex-col min-h-screen`}
       >
         <ClerkProvider>
-          <header className="shrink-0 sticky top-0 z-40 flex justify-between items-center p-4 gap-4 h-16 bg-gray-900 text-white">
+          <header className="shrink-0 sticky top-0 z-40 flex justify-between items-center p-4 gap-4 h-16 bg-gray-950 text-white border-b">
             <Link href="/" className="font-semibold hover:text-teal-500">
               Conlang Studio
             </Link>
@@ -50,9 +51,7 @@ export default function RootLayout({
               <Show when="signed-out">
                 <SignInButton />
                 <SignUpButton>
-                  <button className="bg-teal-700 text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer">
-                    Sign Up
-                  </button>
+                  <Button className="rounded-full">Sign Up</Button>
                 </SignUpButton>
               </Show>
               <Show when="signed-in">

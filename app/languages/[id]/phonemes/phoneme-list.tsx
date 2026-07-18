@@ -3,6 +3,9 @@
 import { useActionState, useId, useState } from 'react';
 import { createPhoneme, updatePhoneme, deletePhoneme } from './actions';
 import type { phonemes } from '@/app/db/schema';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
 
 type Phoneme = typeof phonemes.$inferSelect;
 
@@ -37,7 +40,7 @@ function PhonemeRow({
 
   if (isEditing) {
     return (
-      <li className="flex flex-col gap-2 p-2 border rounded">
+      <li className="flex flex-col gap-2 rounded-lg border bg-card p-2">
         <PhonemeForm
           mode="Edit"
           formAction={editAction}
@@ -46,7 +49,7 @@ function PhonemeRow({
           phoneme={phoneme}
         />
         {editState && !editState.ok && (
-          <p className="text-red-500 text-sm">
+          <p className="text-red-400 text-sm">
             {editState.kind === 'validation'
               ? 'Invalid input — check symbol and weight.'
               : 'Something went wrong. Please try again.'}
@@ -57,7 +60,7 @@ function PhonemeRow({
   }
 
   return (
-    <li className="flex items-center gap-2 p-3 border rounded">
+    <li className="flex items-center gap-2 rounded-lg border bg-card p-3">
       <span className="flex-1 font-mono text-lg px-3">
         {'Symbol: ' + phoneme.symbol}
       </span>
@@ -67,22 +70,24 @@ function PhonemeRow({
       <span className="flex-1 font-mono text-lg px-3">
         {'Weight: ' + phoneme.weight}
       </span>
-      <button
+      <Button
         type="button"
+        variant="edit"
         onClick={() => setIsEditing(true)}
         disabled={deletePending}
-        className="w-32 bg-violet-900 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+        className="w-32"
       >
         Edit
-      </button>
+      </Button>
       <form action={deleteAction}>
-        <button
+        <Button
           type="submit"
+          variant="destructive"
           disabled={deletePending}
-          className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-32"
         >
           Delete
-        </button>
+        </Button>
       </form>
     </li>
   );
@@ -99,7 +104,7 @@ function AddPhonemeForm({ languageId }: { languageId: string }) {
     <div className="mb-6">
       <PhonemeForm mode="Add" formAction={formAction} pending={pending} />
       {state && !state.ok && (
-        <p className="text-red-500 text-sm">
+        <p className="text-red-400 text-sm">
           {state.kind === 'validation'
             ? 'Invalid input — check symbol and weight.'
             : state.kind === 'not_found'
@@ -139,20 +144,20 @@ function PhonemeForm({
   return (
     <form action={formAction} className="flex flex-col gap-2">
       <div className="flex items-center gap-2 px-2">
-        <input
+        <Input
           name="symbol"
           placeholder="Symbol *"
           value={symbol}
           onChange={(e) => setSymbol(e.currentTarget.value)}
           required
-          className="w-40 border rounded p-3 font-mono text-lg text-center"
+          className="w-40 font-mono text-lg text-center"
         />
-        <input
+        <Input
           name="ipa"
           placeholder="IPA"
           value={ipa || ''}
           onChange={(e) => setIPA(e.currentTarget.value)}
-          className="w-40 border rounded p-3 font-mono text-lg text-center"
+          className="w-40 font-mono text-lg text-center"
         />
         <div className="flex flex-1 flex-col items-center px-5">
           <input
@@ -164,25 +169,22 @@ function PhonemeForm({
             step={0.1}
             value={weight}
             onChange={(e) => setWeight(Number(e.currentTarget.value))}
-            className="border rounded mx-3 my-2 w-full accent-violet-500"
+            className="mx-3 my-2 w-full accent-teal-600"
           />
-          <label htmlFor={weightId}>Weight: {weight}</label>
+          <Label htmlFor={weightId}>Weight: {weight}</Label>
         </div>
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-32 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
-        >
+        <Button type="submit" disabled={pending} className="w-32">
           {props.mode === 'Add' ? 'Add' : 'Save'}
-        </button>
+        </Button>
         {props.mode === 'Edit' && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={props.cancel}
-            className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer"
+            className="w-32"
           >
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>
@@ -204,7 +206,7 @@ export default function PhonemeList({
     <div>
       <AddPhonemeForm languageId={languageId} />
       {initialPhonemes.length === 0 ? (
-        <p className="text-gray-500">No phonemes yet. Add one above.</p>
+        <p className="text-muted-foreground">No phonemes yet. Add one above.</p>
       ) : (
         <ul className="space-y-2">
           {[...initialPhonemes]

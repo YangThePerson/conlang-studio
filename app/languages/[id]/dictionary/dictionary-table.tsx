@@ -14,6 +14,10 @@ import {
 } from './actions';
 import { failureMessage, fieldError } from './action-state';
 import TagManager from './tag-manager';
+import { Badge } from '@/app/components/ui/badge';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
 
 type Lexeme = typeof lexemes.$inferSelect;
 type Sense = typeof senses.$inferSelect;
@@ -61,37 +65,28 @@ function AddLexemeForm({ languageId }: { languageId: string }) {
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label htmlFor="new-term" className="text-sm">
-          Term
-        </label>
-        <input
+        <Label htmlFor="new-term">Term</Label>
+        <Input
           id="new-term"
           name="term"
           value={term}
           onChange={(e) => setTerm(e.target.value)}
-          className="border rounded p-2 font-mono w-40"
+          className="font-mono w-40"
         />
       </div>
       <div className="flex flex-col gap-1 flex-1 min-w-48">
-        <label htmlFor="new-notes" className="text-sm">
-          Notes
-        </label>
-        <input
+        <Label htmlFor="new-notes">Notes</Label>
+        <Input
           id="new-notes"
           name="notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="border rounded p-2"
         />
       </div>
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-32 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
-      >
+      <Button type="submit" disabled={pending} className="w-32">
         {pending ? 'Adding…' : 'Add Word'}
-      </button>
-      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+      </Button>
+      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
     </form>
   );
 }
@@ -141,37 +136,32 @@ function AddSenseForm({
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label htmlFor={`new-pos-${lexemeId}`} className="text-sm">
-          Part of speech
-        </label>
-        <input
+        <Label htmlFor={`new-pos-${lexemeId}`}>Part of speech</Label>
+        <Input
           id={`new-pos-${lexemeId}`}
           name="part_of_speech"
           value={pos}
           onChange={(e) => setPos(e.target.value)}
-          className="border rounded p-2 w-40"
+          className="w-40"
         />
       </div>
       <div className="flex flex-col gap-1 flex-1 min-w-48">
-        <label htmlFor={`new-definition-${lexemeId}`} className="text-sm">
-          Definition
-        </label>
-        <input
+        <Label htmlFor={`new-definition-${lexemeId}`}>Definition</Label>
+        <Input
           id={`new-definition-${lexemeId}`}
           name="definition"
           value={definition}
           onChange={(e) => setDefinition(e.target.value)}
-          className="border rounded p-2"
         />
       </div>
-      <button
+      <Button
         type="submit"
         disabled={pending || deleteLexemePending}
-        className="w-32 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+        className="w-32"
       >
         {pending ? 'Adding…' : 'Add Sense'}
-      </button>
-      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+      </Button>
+      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
     </form>
   );
 }
@@ -214,47 +204,43 @@ function SenseEditRow({
         className="flex flex-wrap items-end gap-3 flex-1"
       >
         <div className="flex flex-col gap-1">
-          <label htmlFor={`pos-${sense.id}`} className="text-sm">
-            Part of speech
-          </label>
-          <input
+          <Label htmlFor={`pos-${sense.id}`}>Part of speech</Label>
+          <Input
             id={`pos-${sense.id}`}
             name="part_of_speech"
             value={pos}
             onChange={(e) => setPos(e.target.value)}
-            className="border rounded p-2 w-40"
+            className="w-40"
           />
         </div>
         <div className="flex flex-col gap-1 flex-1 min-w-48">
-          <label htmlFor={`definition-${sense.id}`} className="text-sm">
-            Definition
-          </label>
-          <input
+          <Label htmlFor={`definition-${sense.id}`}>Definition</Label>
+          <Input
             id={`definition-${sense.id}`}
             name="definition"
             value={definition}
             onChange={(e) => setDefinition(e.target.value)}
-            className="border rounded p-2"
           />
         </div>
-        <button
+        <Button
           type="submit"
           disabled={savePending || deletePending || deleteLexemePending}
-          className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-24"
         >
           {savePending ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
       </form>
       <form action={deleteAction}>
-        <button
+        <Button
           type="submit"
+          variant="destructive"
           disabled={savePending || deletePending || deleteLexemePending}
-          className="w-24 bg-red-800 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-24"
         >
           Delete
-        </button>
+        </Button>
       </form>
-      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
     </li>
   );
 }
@@ -279,7 +265,7 @@ function TagChip({
 
   return (
     <form action={action} className="flex flex-col items-start gap-1">
-      <span className="inline-flex items-center gap-1 bg-zinc-700 rounded px-2 py-1 text-sm">
+      <Badge variant="secondary" className="text-sm">
         {tag.name}
         <button
           type="submit"
@@ -290,8 +276,8 @@ function TagChip({
         >
           ×
         </button>
-      </span>
-      {error && <p className="text-red-500 text-xs">{error}</p>}
+      </Badge>
+      {error && <p className="text-red-400 text-xs">{error}</p>}
     </form>
   );
 }
@@ -330,7 +316,7 @@ function AttachTagForm({
 
   if (availableTags.length === 0)
     return (
-      <p className="text-sm text-gray-400">
+      <p className="text-sm text-muted-foreground">
         No more tags to add — create one in Manage tags above.
       </p>
     );
@@ -338,9 +324,7 @@ function AttachTagForm({
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label htmlFor={`attach-tag-${lexemeId}`} className="text-sm">
-          Add tag
-        </label>
+        <Label htmlFor={`attach-tag-${lexemeId}`}>Add tag</Label>
         <select
           id={`attach-tag-${lexemeId}`}
           name="tag_id"
@@ -353,20 +337,20 @@ function AttachTagForm({
             Select a tag
           </option>
           {availableTags.map((tag) => (
-            <option className="bg-black" key={tag.id} value={tag.id}>
+            <option className="bg-popover" key={tag.id} value={tag.id}>
               {tag.name}
             </option>
           ))}
         </select>
       </div>
-      <button
+      <Button
         type="submit"
         disabled={pending || deleteLexemePending || tagId === ''}
-        className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+        className="w-24"
       >
         {pending ? 'Adding…' : 'Attach'}
-      </button>
-      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+      </Button>
+      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
     </form>
   );
 }
@@ -415,38 +399,33 @@ function LexemeEditCard({
       {/* Lexeme fields */}
       <form action={saveAction} className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label htmlFor={`term-${lexeme.id}`} className="text-sm">
-            Term
-          </label>
-          <input
+          <Label htmlFor={`term-${lexeme.id}`}>Term</Label>
+          <Input
             id={`term-${lexeme.id}`}
             name="term"
             value={term}
             onChange={(e) => setTerm(e.target.value)}
-            className="border rounded p-2 font-mono w-40"
+            className="font-mono w-40"
           />
         </div>
         <div className="flex flex-col gap-1 flex-1 min-w-48">
-          <label htmlFor={`notes-${lexeme.id}`} className="text-sm">
-            Notes
-          </label>
-          <input
+          <Label htmlFor={`notes-${lexeme.id}`}>Notes</Label>
+          <Input
             id={`notes-${lexeme.id}`}
             name="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="border rounded p-2"
           />
         </div>
-        <button
+        <Button
           type="submit"
           disabled={savePending || deletePending}
-          className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-24"
         >
           {savePending ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
         {lexemeError && (
-          <p className="text-red-500 text-sm w-full">{lexemeError}</p>
+          <p className="text-red-400 text-sm w-full">{lexemeError}</p>
         )}
       </form>
 
@@ -499,22 +478,24 @@ function LexemeEditCard({
       {/* Entry-level controls */}
       <div className="flex items-center justify-end gap-2 border-t pt-3">
         <form action={deleteAction}>
-          <button
+          <Button
             type="submit"
+            variant="destructive"
             disabled={savePending || deletePending}
-            className="w-32 bg-red-800 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+            className="w-32"
           >
             Delete Entry
-          </button>
+          </Button>
         </form>
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={close}
           disabled={savePending || deletePending}
-          className="w-24 bg-gray-600 text-white px-3 py-2 rounded cursor-pointer disabled:opacity-50 disabled:cursor-progress"
+          className="w-24"
         >
           Done
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -567,7 +548,7 @@ function LexemeEntry({
 
   return (
     <>
-      <tr className={'border-t ' + (isEven ? 'bg-zinc-900' : 'bg-zinc-800')}>
+      <tr className={'border-t ' + (isEven ? 'bg-card/50' : 'bg-card')}>
         <td rowSpan={lexemeRowSpan} className="py-2 font-mono">
           {lexeme.term}
           {lexeme.fits_phonotactics === false && (
@@ -587,7 +568,7 @@ function LexemeEntry({
             <td className="py-2">{firstSense.definition}</td>
           </>
         ) : (
-          <td colSpan={2} className="py-2 text-gray-400 italic">
+          <td colSpan={2} className="py-2 text-muted-foreground italic">
             No senses yet
           </td>
         )}
@@ -599,23 +580,27 @@ function LexemeEntry({
         </td>
         <td rowSpan={lexemeRowSpan} className="py-2">
           <form className="gap-2 flex flex-wrap" action={deleteAction}>
-            <button
+            <Button
               type="button"
+              variant="edit"
+              size="sm"
               disabled={deletePending}
               onClick={() => setIsEditing(true)}
-              className="w-24 bg-violet-900 text-white px-3 py-1 rounded cursor-pointer"
+              className="w-24"
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="destructive"
+              size="sm"
               disabled={deletePending}
-              className="w-24 bg-red-800 text-white px-3 py-1 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+              className="w-24"
             >
               Delete
-            </button>
+            </Button>
             {deleteError && (
-              <p className="text-red-500 text-sm w-full text-left">
+              <p className="text-red-400 text-sm w-full text-left">
                 {deleteError}
               </p>
             )}
@@ -623,7 +608,7 @@ function LexemeEntry({
         </td>
       </tr>
       {restSenses.map((sense) => (
-        <tr key={sense.id} className={isEven ? 'bg-zinc-900' : 'bg-zinc-800'}>
+        <tr key={sense.id} className={isEven ? 'bg-card/50' : 'bg-card'}>
           <td className="py-2">{sense.part_of_speech || '—'}</td>
           <td className="py-2">{sense.definition}</td>
         </tr>
@@ -717,22 +702,17 @@ function DictionaryControls({
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1 flex-1 min-w-48">
-        <label htmlFor="dictionary-search" className="text-sm">
-          Search
-        </label>
-        <input
+        <Label htmlFor="dictionary-search">Search</Label>
+        <Input
           id="dictionary-search"
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="border rounded p-2"
         />
       </div>
       {tagOptions.length > 0 && (
         <div className="flex flex-col gap-1">
-          <label htmlFor="dictionary-tag-filter" className="text-sm">
-            Tag
-          </label>
+          <Label htmlFor="dictionary-tag-filter">Tag</Label>
           <select
             id="dictionary-tag-filter"
             value={tagFilter}
@@ -741,7 +721,7 @@ function DictionaryControls({
           >
             <option value="all">All tags</option>
             {tagOptions.map((tag) => (
-              <option className="bg-black" key={tag.id} value={tag.id}>
+              <option className="bg-popover" key={tag.id} value={tag.id}>
                 {tag.name}
               </option>
             ))}
@@ -749,76 +729,70 @@ function DictionaryControls({
         </div>
       )}
       <div className="flex flex-col gap-1">
-        <label htmlFor="dictionary-origin-filter" className="text-sm">
-          Origin
-        </label>
+        <Label htmlFor="dictionary-origin-filter">Origin</Label>
         <select
           id="dictionary-origin-filter"
           value={originFilter}
           onChange={(e) => setOriginFilter(e.target.value as OriginFilter)}
           className="border rounded p-2"
         >
-          <option className="bg-black" value="all">
+          <option className="bg-popover" value="all">
             All origins
           </option>
-          <option className="bg-black" value="manual">
+          <option className="bg-popover" value="manual">
             Manual
           </option>
-          <option className="bg-black" value="generated">
+          <option className="bg-popover" value="generated">
             Generated
           </option>
         </select>
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="dictionary-fit-filter" className="text-sm">
-          Phonotactics
-        </label>
+        <Label htmlFor="dictionary-fit-filter">Phonotactics</Label>
         <select
           id="dictionary-fit-filter"
           value={fitFilter}
           onChange={(e) => setFitFilter(e.target.value as FitFilter)}
           className="border rounded p-2"
         >
-          <option className="bg-black" value="all">
+          <option className="bg-popover" value="all">
             All
           </option>
-          <option className="bg-black" value="fits">
+          <option className="bg-popover" value="fits">
             Fits
           </option>
-          <option className="bg-black" value="violates">
+          <option className="bg-popover" value="violates">
             Doesn&apos;t fit
           </option>
         </select>
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="dictionary-sort" className="text-sm">
-          Sort
-        </label>
+        <Label htmlFor="dictionary-sort">Sort</Label>
         <select
           id="dictionary-sort"
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
           className="border rounded p-2"
         >
-          <option className="bg-black" value="term-asc">
+          <option className="bg-popover" value="term-asc">
             Term A→Z
           </option>
-          <option className="bg-black" value="term-desc">
+          <option className="bg-popover" value="term-desc">
             Term Z→A
           </option>
-          <option className="bg-black" value="created-desc">
+          <option className="bg-popover" value="created-desc">
             Newest first
           </option>
-          <option className="bg-black" value="created-asc">
+          <option className="bg-popover" value="created-asc">
             Oldest first
           </option>
-          <option className="bg-black" value="updated-desc">
+          <option className="bg-popover" value="updated-desc">
             Recently updated
           </option>
-          <option className="bg-black" value="updated-asc">
+          <option className="bg-popover" value="updated-asc">
             Least recently updated
           </option>
-          <option className="bg-black" value="default">
+          <option className="bg-popover" value="default">
             Original order
           </option>
         </select>
@@ -881,7 +855,7 @@ export default function DictionaryTable({
       <AddLexemeForm languageId={languageId} />
       <TagManager languageId={languageId} tags={allTags} />
       {dictionary.length === 0 ? (
-        <p className="text-gray-400">
+        <p className="text-muted-foreground">
           No words yet — add one above, or bank some from the word generator.
         </p>
       ) : (
@@ -900,13 +874,13 @@ export default function DictionaryTable({
             setSort={setSort}
           />
           {visible.length === 0 ? (
-            <p className="text-gray-400">
+            <p className="text-muted-foreground">
               No entries match the current filters.
             </p>
           ) : (
             <>
               {visible.length < dictionary.length && (
-                <p className="text-gray-400 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Showing {visible.length} of {dictionary.length}{' '}
                   {dictionary.length === 1 ? 'entry' : 'entries'}
                 </p>

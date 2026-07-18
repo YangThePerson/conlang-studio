@@ -4,6 +4,9 @@ import { useEffect, useState, useTransition } from 'react';
 import { syllable_structures } from '@/app/db/schema';
 import { redirect } from 'next/navigation';
 import { addWordToDictionary, generateWords } from './actions';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
 
 type SyllableStructure = typeof syllable_structures.$inferSelect;
 
@@ -74,47 +77,49 @@ function WordGenControls({
   if (!structures.length)
     return (
       <div className="flex-1 py-4 px-16 flex flex-col justify-center items-center gap-4">
-        <p className="text-gray-400">No syllable structures yet.</p>
-        <button
+        <p className="text-muted-foreground">No syllable structures yet.</p>
+        <Button
           role="link"
+          variant="secondary"
           onClick={() => redirect(`/languages/${languageId}/syllables`)}
-          className="w-40 bg-gray-600 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer"
+          className="w-40"
         >
           Go to Syllables
-        </button>
+        </Button>
       </div>
     );
 
   return (
     <form className="flex-1 p-4 flex flex-col gap-2 items-center">
-      <label>
+      <Label className="font-normal">
         Min Syllables:
-        <input
-          className="border rounded text-center p-2 w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        <Input
+          className="text-center w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           type="number"
           defaultValue={minSyllables}
           onChange={(e) => setMinSyllables(Number(e.currentTarget.value))}
           min={1}
         />
-      </label>
-      <label>
+      </Label>
+      <Label className="font-normal">
         Max Syllables:
-        <input
-          className="border rounded text-center p-2 w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        <Input
+          className="text-center w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           type="number"
           defaultValue={maxSyllables}
           onChange={(e) => setMaxSyllables(Number(e.currentTarget.value))}
           min={1}
         />
-      </label>
-      <input
+      </Label>
+      <Button
         type="button"
         onClick={generateWordsTransition}
-        className="w-40 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer m-2"
-        value={pending ? 'Generating...' : 'Generate'}
+        className="w-40 m-2"
         disabled={pending}
-      />
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      >
+        {pending ? 'Generating...' : 'Generate'}
+      </Button>
+      {error && <p className="text-red-400 text-sm">{error}</p>}
     </form>
   );
 }
@@ -163,44 +168,46 @@ function WordPanel({
 
   if (!words.length)
     return (
-      <div className="flex-2 py-4 px-16 border rounded flex flex-col justify-center items-center gap-4">
-        <p className="text-gray-400">No words have been generated yet.</p>
+      <div className="flex-2 py-4 px-16 rounded-lg border bg-card flex flex-col justify-center items-center gap-4">
+        <p className="text-muted-foreground">No words have been generated yet.</p>
       </div>
     );
 
   if (generationPending)
     return (
-      <div className="flex-2 py-4 px-16 border rounded flex flex-col justify-center items-center gap-4">
-        <p className="text-gray-400">Generating words...</p>
+      <div className="flex-2 py-4 px-16 rounded-lg border bg-card flex flex-col justify-center items-center gap-4">
+        <p className="text-muted-foreground">Generating words...</p>
       </div>
     );
 
   return (
-    <div className="flex-2 border rounded flex flex-col justify-center items-start gap-2">
+    <div className="flex-2 rounded-lg border bg-card flex flex-col justify-center items-start gap-2">
       {shortfall && (
-        <p className="text-amber-600 text-sm">
+        <p className="text-amber-500 text-sm">
           Only generated {shortfall.got} of {shortfall.requested} words — the
           phonological space is too constrained for more unique words.
         </p>
       )}
-      {addError && <p className="text-red-500 text-sm">{addError}</p>}
+      {addError && <p className="text-red-400 text-sm">{addError}</p>}
       <ul className="flex flex-1 flex-col font-mono justify-around w-full">
         {words.map((word, i) => {
           const added = addedWords.has(word);
           return (
             <li
-              className={`flex flex-1 items-center justify-between hover:bg-gray-800`}
+              className={`flex flex-1 items-center justify-between hover:bg-accent/50`}
               key={i}
             >
               <span className="ml-12">{word}</span>
-              <button
+              <Button
+                type="button"
+                size="xs"
                 onClick={() => addWord(word)}
                 title={added ? 'Added to Dictionary' : 'Add to Dictionary'}
                 disabled={added || addWordPending}
-                className="w-fit h-fit rounded mr-2 bg-teal-700 text-white px-4 disabled:opacity-50 cursor-pointer"
+                className="mr-2 w-10"
               >
                 {added ? '✓' : '+'}
-              </button>
+              </Button>
             </li>
           );
         })}

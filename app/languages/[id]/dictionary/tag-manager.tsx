@@ -4,6 +4,9 @@ import { tags } from '@/app/db/schema';
 import { useActionState, useState } from 'react';
 import { createTag, deleteTag, renameTag } from './actions';
 import { failureMessage, fieldError } from './action-state';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
 
 type Tag = typeof tags.$inferSelect;
 
@@ -31,25 +34,19 @@ function AddTagForm({ languageId }: { languageId: string }) {
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label htmlFor="new-tag-name" className="text-sm">
-          New tag
-        </label>
-        <input
+        <Label htmlFor="new-tag-name">New tag</Label>
+        <Input
           id="new-tag-name"
           name="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="border rounded p-2 w-48"
+          className="w-48"
         />
       </div>
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
-      >
+      <Button type="submit" disabled={pending} className="w-24">
         {pending ? 'Adding…' : 'Add Tag'}
-      </button>
-      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+      </Button>
+      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
     </form>
   );
 }
@@ -76,35 +73,33 @@ function TagRow({ languageId, tag }: { languageId: string; tag: Tag }) {
     <li className="flex flex-wrap items-end gap-3">
       <form action={renameAction} className="flex items-end gap-2 flex-1">
         <div className="flex flex-col gap-1 flex-1 min-w-40">
-          <label htmlFor={`tag-name-${tag.id}`} className="text-sm">
-            Name
-          </label>
-          <input
+          <Label htmlFor={`tag-name-${tag.id}`}>Name</Label>
+          <Input
             id={`tag-name-${tag.id}`}
             name="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="border rounded p-2"
           />
         </div>
-        <button
+        <Button
           type="submit"
           disabled={renamePending || deletePending}
-          className="w-24 bg-teal-700 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-24"
         >
           {renamePending ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
       </form>
       <form action={deleteAction}>
-        <button
+        <Button
           type="submit"
+          variant="destructive"
           disabled={renamePending || deletePending}
-          className="w-24 bg-red-800 text-white px-3 py-2 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-24"
         >
           Delete
-        </button>
+        </Button>
       </form>
-      {error && <p className="text-red-500 text-sm w-full">{error}</p>}
+      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
     </li>
   );
 }
@@ -122,7 +117,7 @@ export default function TagManager({
   tags: Tag[];
 }) {
   return (
-    <details className="border rounded p-3">
+    <details className="rounded-lg border bg-card p-3">
       <summary className="cursor-pointer font-semibold text-sm">
         Manage tags {tags.length > 0 && `(${tags.length})`}
       </summary>

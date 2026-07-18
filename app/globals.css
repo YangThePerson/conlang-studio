@@ -1,37 +1,114 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens (shadcn/ui convention). The app ships dark-only for now —
+ * the `dark` class is hardcoded on <html> in the root layout — but the light
+ * palette is kept current so flipping that class is all a future light mode
+ * needs. Values are drawn from the Tailwind gray scale with teal-700 as the
+ * single accent, matching the palette the app grew up with.
+ */
 :root {
+  --radius: 0.5rem;
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #0f766e;
+  --primary-foreground: #ffffff;
+  --secondary: #e5e7eb;
+  --secondary-foreground: #111827;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --accent: #f3f4f6;
+  --accent-foreground: #111827;
+  --destructive: #dc2626;
+  --border: #e5e7eb;
+  --input: #d1d5db;
+  --ring: #0d9488;
+}
+
+.dark {
   --background: #111827;
   --foreground: #f9fafb;
+  --card: #1f2937;
+  --card-foreground: #f9fafb;
+  --popover: #1f2937;
+  --popover-foreground: #f9fafb;
+  --primary: #0f766e;
+  --primary-foreground: #ffffff;
+  --secondary: #4b5563;
+  --secondary-foreground: #ffffff;
+  --muted: #1f2937;
+  --muted-foreground: #9ca3af;
+  --accent: #374151;
+  --accent-foreground: #f9fafb;
+  --destructive: #dc2626;
+  --border: #374151;
+  --input: #4b5563;
+  --ring: #14b8a6;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono:
     var(--font-geist-mono), var(--font-noto-sans-mono), ui-monospace, monospace;
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 @layer base {
-  *,
-  ::before,
-  ::after {
-    border-color: #374151;
+  * {
+    @apply border-border outline-ring/50;
   }
 
-  input:not([type='range']):not([type='checkbox']):not([type='radio']):not(
-      [type='button']
-    ):not([type='submit']):not([type='reset']),
+  html,
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  /*
+   * Safety net for native form controls that aren't (yet) wrapped in a ui/
+   * component — mainly <select>. Browsers don't inherit text color into form
+   * controls, so without this a native control renders near-black text on the
+   * dark background. Zero-specificity :where() so any utility class wins.
+   */
   select,
-  textarea {
-    background-color: #1f2937;
-    color: #f9fafb;
+  textarea,
+  input:where(
+      :not(
+          [type='range'],
+          [type='checkbox'],
+          [type='radio'],
+          [type='button'],
+          [type='submit'],
+          [type='reset']
+        )
+    ) {
+    background-color: var(--card);
+    color: var(--foreground);
   }
 }

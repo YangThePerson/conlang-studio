@@ -19,9 +19,9 @@ export default function SideBar({ languageId }: { languageId: string }) {
   return (
     <aside
       className={`
-        fixed inset-y-0 left-0 z-50 w-64 transform bg-gray-900 text-white shadow-xl
+        inset-y-0 left-0 w-64 transform bg-gray-950 text-white shadow-xl
         transition-transform duration-300 ease-in-out
-        lg:static lg:translate-x-0 lg:z-auto
+        static translate-x-0 z-auto
       `}
     >
       <nav className="flex flex-col gap-1 p-4">

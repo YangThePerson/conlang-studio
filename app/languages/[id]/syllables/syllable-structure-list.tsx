@@ -10,6 +10,8 @@ import {
 } from './actions';
 import { templateSchema } from '@/app/db/json-shapes';
 import { z } from 'zod';
+import { Button } from '@/app/components/ui/button';
+import { Label } from '@/app/components/ui/label';
 
 type Phoneme = typeof phonemes.$inferSelect;
 type SyllableStructure = typeof syllable_structures.$inferSelect;
@@ -68,14 +70,14 @@ function AddSyllableStructureForm({
           groups={groups}
         />
       ) : (
-        <button
-          type="submit"
+        <Button
+          type="button"
           disabled={pending}
           onClick={() => setIsAdding(true)}
-          className="w-60 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-60"
         >
           Add Syllable Structure
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -134,8 +136,8 @@ function SyllableStructureRow({
     );
 
   return (
-    <li className="flex items-center gap-2 p-3 border rounded justify-between">
-      <div className="flex clex-row mx-3 w-full">
+    <li className="flex items-center gap-2 rounded-lg border bg-card p-3 justify-between">
+      <div className="flex flex-row mx-3 w-full">
         <p className="flex-2 font-mono">
           Template:
           {structure.template.map((slot, i) => {
@@ -146,22 +148,24 @@ function SyllableStructureRow({
         <p className="flex-1 font-mono">Weight: {structure.weight}</p>
       </div>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="edit"
           onClick={() => setIsEditing(true)}
           disabled={deletePending}
-          className="w-32 bg-violet-900 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+          className="w-32"
         >
           Edit
-        </button>
+        </Button>
         <form action={deleteAction}>
-          <button
+          <Button
             type="submit"
+            variant="destructive"
             disabled={deletePending}
-            className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer disabled:cursor-progress"
+            className="w-32"
           >
             Delete
-          </button>
+          </Button>
         </form>
       </div>
     </li>
@@ -232,14 +236,14 @@ function SyllableStructureForm({
   return (
     <form
       action={formAction}
-      className="flex flex-col items-end gap-2 p-5 border rounded mb-3"
+      className="flex flex-col items-end gap-2 rounded-lg border bg-card p-5 mb-3"
     >
       <input type="hidden" name="template" value={JSON.stringify(template)} />
 
       {/* Template slot chips */}
       <div className="flex flex-wrap gap-1 min-h-8 items-center w-full py-3 px-7">
         {template.length === 0 ? (
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-muted-foreground">
             No slots yet — add one below.
           </span>
         ) : (
@@ -248,14 +252,14 @@ function SyllableStructureForm({
             return (
               <div
                 key={idx}
-                className="flex items-center gap-0.5 bg-gray-950 border rounded p-4 text-sm font-mono"
+                className="flex items-center gap-0.5 bg-muted border rounded-md p-4 text-sm font-mono"
               >
                 <span>{slot.optional ? `(${label})` : label}</span>
                 <button
                   type="button"
                   onClick={() => moveSlot(idx, -1)}
                   disabled={idx === 0}
-                  className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                  className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                   aria-label="Move left"
                 >
                   ←
@@ -264,7 +268,7 @@ function SyllableStructureForm({
                   type="button"
                   onClick={() => moveSlot(idx, 1)}
                   disabled={idx === template.length - 1}
-                  className="px-0.5 text-gray-400 enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+                  className="px-0.5 text-muted-foreground enabled:hover:text-gray-200 disabled:opacity-30 cursor-pointer disabled:cursor-auto"
                   aria-label="Move right"
                 >
                   →
@@ -272,7 +276,7 @@ function SyllableStructureForm({
                 <button
                   type="button"
                   onClick={() => removeSlot(idx)}
-                  className="px-0.5 text-gray-400 hover:text-red-600 cursor-pointer"
+                  className="px-0.5 text-muted-foreground hover:text-red-600 cursor-pointer"
                   aria-label="Remove slot"
                 >
                   ×
@@ -311,26 +315,28 @@ function SyllableStructureForm({
                 </optgroup>
               )}
             </select>
-            <label className="flex items-center gap-1 text-sm">
+            <Label className="gap-1 font-normal">
               <input
                 type="checkbox"
                 checked={newOptional}
                 onChange={(e) => setNewOptional(e.target.checked)}
+                className="accent-teal-600"
               />
               Optional
-            </label>
-            <button
+            </Label>
+            <Button
               type="button"
+              variant="secondary"
               onClick={addSlot}
               disabled={!newSelection}
-              className="w-32 bg-gray-600 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer"
+              className="w-32"
             >
               + Add slot
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-muted-foreground">
           Add phonemes or groups to this language before building a template.
         </p>
       )}
@@ -346,28 +352,29 @@ function SyllableStructureForm({
           step={0.1}
           value={weight}
           onChange={(e) => setWeight(Number(e.currentTarget.value))}
-          className="border rounded mx-3 my-2 w-full accent-violet-500"
+          className="mx-3 my-2 w-full accent-teal-600"
         />
-        <label htmlFor={'weight'}>Weight: {weight}</label>
+        <Label htmlFor={'weight'}>Weight: {weight}</Label>
       </div>
 
       {/* Commit or Cancel Changes */}
       <div className="flex flex-row gap-2">
-        <button
+        <Button
           type="submit"
           disabled={pending || !template.length}
-          className={`w-32 bg-teal-700 text-white px-4 py-3 rounded disabled:opacity-50 enabled:cursor-pointer disabled:${pending ? 'cursor-progress' : 'cursor-auto'}`}
+          className="w-32"
         >
           {mode === 'Add' ? 'Add' : 'Save'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="secondary"
           onClick={cancel}
           disabled={pending}
-          className="w-32 bg-red-800 text-white px-4 py-3 rounded disabled:opacity-50 cursor-pointer"
+          className="w-32"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -397,7 +404,7 @@ export default function SyllableStructureList({
         groups={groups}
       />
       {initialStructures.length === 0 ? (
-        <p className="text-gray-400">
+        <p className="text-muted-foreground">
           No syllable structures yet. Add one above.
         </p>
       ) : (
