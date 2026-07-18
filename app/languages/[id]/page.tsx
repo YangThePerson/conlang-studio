@@ -95,7 +95,7 @@ export default async function LanguagePage({
             <h2 className="text-lg font-semibold">Recently added words</h2>
             <Link
               href={`/languages/${id}/dictionary`}
-              className="text-sm text-teal-400 hover:underline"
+              className="text-sm text-primary hover:underline"
             >
               View dictionary
             </Link>

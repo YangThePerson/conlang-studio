@@ -43,8 +43,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansMono.variable} antialiased flex flex-col min-h-screen`}
       >
         <ClerkProvider>
-          <header className="shrink-0 sticky top-0 z-40 flex justify-between items-center p-4 gap-4 h-16 bg-gray-950 text-white border-b">
-            <Link href="/" className="font-semibold hover:text-teal-500">
+          <header className="shrink-0 sticky top-0 z-40 flex justify-between items-center p-4 gap-4 h-16 bg-[#0a0d08] text-white border-b">
+            <Link href="/" className="font-semibold hover:text-primary">
               Conlang Studio
             </Link>
             <div className="flex items-center gap-4">
@@ -57,7 +57,7 @@ export default function RootLayout({
               <Show when="signed-in">
                 <Link
                   href="/languages"
-                  className="text-sm font-medium hover:text-teal-500"
+                  className="text-sm font-medium hover:text-primary"
                 >
                   Languages
                 </Link>

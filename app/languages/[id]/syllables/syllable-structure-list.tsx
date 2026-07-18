@@ -320,7 +320,7 @@ function SyllableStructureForm({
                 type="checkbox"
                 checked={newOptional}
                 onChange={(e) => setNewOptional(e.target.checked)}
-                className="accent-teal-600"
+                className="accent-primary"
               />
               Optional
             </Label>
@@ -352,7 +352,7 @@ function SyllableStructureForm({
           step={0.1}
           value={weight}
           onChange={(e) => setWeight(Number(e.currentTarget.value))}
-          className="mx-3 my-2 w-full accent-teal-600"
+          className="mx-3 my-2 w-full accent-primary"
         />
         <Label htmlFor={'weight'}>Weight: {weight}</Label>
       </div>

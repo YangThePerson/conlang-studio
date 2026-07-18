@@ -19,7 +19,7 @@ export default function SideBar({ languageId }: { languageId: string }) {
   return (
     <aside
       className={`
-        inset-y-0 left-0 w-64 transform bg-gray-950 text-white shadow-xl
+        inset-y-0 left-0 w-64 transform bg-[#0a0d08] text-white shadow-xl
         transition-transform duration-300 ease-in-out
         static translate-x-0 z-auto
       `}
@@ -34,8 +34,8 @@ export default function SideBar({ languageId }: { languageId: string }) {
               href={href}
               className={`rounded px-3 py-2 text-sm transition-colors ${
                 active
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-secondary text-secondary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               }`}
             >
               {label}

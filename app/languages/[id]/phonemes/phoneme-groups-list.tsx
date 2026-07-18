@@ -87,7 +87,7 @@ function EditGroupForm({
                   name="phoneme_id"
                   value={p.id}
                   defaultChecked={group.members.some((m) => m.id === p.id)}
-                  className="accent-teal-600"
+                  className="accent-primary"
                 />
                 <Label className="w-full font-normal" htmlFor={`phn-${i}`}>
                   {formattedName}

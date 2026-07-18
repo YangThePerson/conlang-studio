@@ -380,7 +380,7 @@ function ContextEditor({
             checked={newOptional}
             disabled={newSelection === 'boundary'}
             onChange={(e) => setNewOptional(e.target.checked)}
-            className="accent-teal-600"
+            className="accent-primary"
           />
           Optional
         </Label>
@@ -496,7 +496,7 @@ function RuleForm({
             value="phoneme"
             checked={targetKind === 'phoneme'}
             onChange={() => switchTargetKind('phoneme')}
-            className="accent-teal-600"
+            className="accent-primary"
           />
           Phoneme
         </Label>
@@ -508,7 +508,7 @@ function RuleForm({
             checked={targetKind === 'group'}
             onChange={() => switchTargetKind('group')}
             disabled={groups.length === 0}
-            className="accent-teal-600"
+            className="accent-primary"
           />
           Group
         </Label>

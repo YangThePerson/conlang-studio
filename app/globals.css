@@ -6,50 +6,57 @@
  * Design tokens (shadcn/ui convention). The app ships dark-only for now —
  * the `dark` class is hardcoded on <html> in the root layout — but the light
  * palette is kept current so flipping that class is all a future light mode
- * needs. Values are drawn from the Tailwind gray scale with teal-700 as the
- * single accent, matching the palette the app grew up with.
+ * needs. Palette direction: "Cloth & Gilt" — bottle-green bookcloth with a
+ * brass/gilt accent, evoking the bound reference volumes the dictionary
+ * feature is building toward. `--edit` is a project-specific token (not a
+ * shadcn default) backing the Button `edit` variant, kept alongside the
+ * standard tokens so it themes the same way.
  */
 :root {
-  --radius: 0.5rem;
-  --background: #ffffff;
-  --foreground: #111827;
-  --card: #ffffff;
-  --card-foreground: #111827;
-  --popover: #ffffff;
-  --popover-foreground: #111827;
-  --primary: #0f766e;
-  --primary-foreground: #ffffff;
-  --secondary: #e5e7eb;
-  --secondary-foreground: #111827;
-  --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
-  --accent: #f3f4f6;
-  --accent-foreground: #111827;
-  --destructive: #dc2626;
-  --border: #e5e7eb;
-  --input: #d1d5db;
-  --ring: #0d9488;
+  --radius: 0.25rem;
+  --background: #f3f1e4;
+  --foreground: #1c2117;
+  --card: #faf8ef;
+  --card-foreground: #1c2117;
+  --popover: #faf8ef;
+  --popover-foreground: #1c2117;
+  --primary: #8a6a2e;
+  --primary-foreground: #fbf6e8;
+  --secondary: #e3e0d0;
+  --secondary-foreground: #1c2117;
+  --muted: #ece9db;
+  --muted-foreground: #5f6653;
+  --accent: #e3e0d0;
+  --accent-foreground: #1c2117;
+  --destructive: #a13d26;
+  --border: #ddd8c4;
+  --input: #c9c3a8;
+  --ring: #8a6a2e;
+  --edit: #5a3d5e;
+  --edit-foreground: #f6ecf7;
 }
 
 .dark {
-  --background: #111827;
-  --foreground: #f9fafb;
-  --card: #1f2937;
-  --card-foreground: #f9fafb;
-  --popover: #1f2937;
-  --popover-foreground: #f9fafb;
-  --primary: #0f766e;
-  --primary-foreground: #ffffff;
-  --secondary: #4b5563;
-  --secondary-foreground: #ffffff;
-  --muted: #1f2937;
-  --muted-foreground: #9ca3af;
-  --accent: #374151;
-  --accent-foreground: #f9fafb;
-  --destructive: #dc2626;
-  --border: #374151;
-  --input: #4b5563;
-  --ring: #14b8a6;
+  --background: #10140f;
+  --foreground: #ede7d9;
+  --card: #171d15;
+  --card-foreground: #ede7d9;
+  --popover: #171d15;
+  --popover-foreground: #ede7d9;
+  --primary: #c2a154;
+  --primary-foreground: #171208;
+  --secondary: #2a3324;
+  --secondary-foreground: #ede7d9;
+  --muted: #171d15;
+  --muted-foreground: #9aa290;
+  --accent: #2a3324;
+  --accent-foreground: #ede7d9;
+  --destructive: #b5482f;
+  --border: #2a3324;
+  --input: #3a4530;
+  --ring: #d4b671;
+  --edit: #6b4a6e;
+  --edit-foreground: #f4e9f5;
 }
 
 @theme inline {
@@ -71,6 +78,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-edit: var(--edit);
+  --color-edit-foreground: var(--edit-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono:
     var(--font-geist-mono), var(--font-noto-sans-mono), ui-monospace, monospace;

@@ -169,7 +169,7 @@ function PhonemeForm({
             step={0.1}
             value={weight}
             onChange={(e) => setWeight(Number(e.currentTarget.value))}
-            className="mx-3 my-2 w-full accent-teal-600"
+            className="mx-3 my-2 w-full accent-primary"
           />
           <Label htmlFor={weightId}>Weight: {weight}</Label>
         </div>
