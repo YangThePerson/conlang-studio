@@ -17,13 +17,12 @@ Re-read the Architecture, Security, and Result-shape sections of CLAUDE.md first
 - Structured `jsonb` payloads get their Zod shape + TS type in `app/db/json-shapes.ts`, wired with `.$type<Shape>()` — see `syllable_structures.template`.
 - **Add `relations(...)` entries** for the new table and everything it references. `db.query.<table>.findMany({ with: ... })` silently has no relations without them.
 
-## 2. Sync the DB
+## 2. Generate and apply a migration
 
 ```
-npm run db:push
+npm run db:generate
+npm run db:migrate
 ```
-
-No migration files — this project pushes the schema directly (dev-stage Neon).
 
 ## 3. Schemas — `app/db/validation.ts`
 

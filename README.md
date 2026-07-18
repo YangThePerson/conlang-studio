@@ -74,11 +74,10 @@ Requires a [Neon](https://neon.tech/) Postgres database and a
    CLERK_TEST_USER_PASSWORD=
    ```
 
-3. Push the schema to your database (see [Database](#database) — this
-   project uses `db:push`, not migrations):
+3. Apply migrations to your database (see [Database](#database)):
 
    ```bash
-   npm run db:push
+   npm run db:migrate
    ```
 
 4. Start the dev server:
@@ -97,7 +96,8 @@ Requires a [Neon](https://neon.tech/) Postgres database and a
 | `npm run build`       | Production build; also the strictest whole-project type check |
 | `npm run test:run`    | Vitest, single pass (`npm test` runs in watch mode)          |
 | `npm run lint`        | ESLint                                                        |
-| `npm run db:push`     | Sync `app/db/schema.ts` to the database                      |
+| `npm run db:generate`  | Generate a migration from schema changes in `app/db/schema.ts` |
+| `npm run db:migrate`   | Apply pending migrations to the database                      |
 
 ## Architecture
 
@@ -130,6 +130,6 @@ expectations) are documented in `CLAUDE.md`.
 
 ## Database
 
-Schema changes are applied with `drizzle-kit push` directly against Neon —
-there is no committed migrations directory. `db:generate`/`db:migrate` exist
-in `package.json` but aren't the current workflow.
+Schema changes go through committed migrations in `drizzle/`: run
+`npm run db:generate` after editing `app/db/schema.ts` to produce a migration
+file, then `npm run db:migrate` to apply it to Neon.

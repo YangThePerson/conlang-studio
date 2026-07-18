@@ -8,7 +8,8 @@
 - `npm run test:run` — vitest, single pass (`npm test` is watch mode; don't use it from an agent)
 - `npm run lint` — ESLint
 - `npm run build` — production build; also the strictest whole-project type check
-- `npm run db:push` — sync `app/db/schema.ts` to the Neon database. This is the workflow in use (there is no committed migrations directory); `db:generate`/`db:migrate` exist but are not current practice.
+- `npm run db:generate` — after editing `app/db/schema.ts`, generate a migration file into `drizzle/`.
+- `npm run db:migrate` — apply pending migrations in `drizzle/` to the Neon database. This is the only schema-sync workflow; `db:push` has been retired now that migrations are committed.
 - Requires `DATABASE_URL` (Neon) and Clerk keys in `.env`.
 
 ## Next.js version notes
