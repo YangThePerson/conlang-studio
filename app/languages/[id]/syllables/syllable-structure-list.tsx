@@ -290,7 +290,7 @@ function SyllableStructureForm({
             <select
               value={newSelection}
               onChange={(e) => setNewSelection(e.target.value)}
-              className="border rounded p-3 text-sm bg-gray-900"
+              className="border rounded p-3 text-sm bg-gray-800"
             >
               {groups.length > 0 && (
                 <optgroup label="Groups">

@@ -348,7 +348,7 @@ function ContextEditor({
           value={newSelection}
           onChange={(e) => setNewSelection(e.target.value)}
           aria-label={`Add slot to ${label.toLowerCase()}`}
-          className="border rounded p-2 text-sm bg-gray-900"
+          className="border rounded p-2 text-sm bg-gray-800"
         >
           <option value="boundary"># Word boundary</option>
           {groups.length > 0 && (
@@ -509,7 +509,7 @@ function RuleForm({
           value={targetId}
           onChange={(e) => setTargetId(e.target.value)}
           aria-label="Target"
-          className="border rounded p-2 text-sm bg-gray-900"
+          className="border rounded p-2 text-sm bg-gray-800"
         >
           {targetOptions.map((t) => (
             <option key={t.id} value={t.id}>
@@ -524,7 +524,7 @@ function RuleForm({
           value={outputId}
           onChange={(e) => setOutputId(e.target.value)}
           aria-label="Output phoneme"
-          className="border rounded p-2 text-sm bg-gray-900"
+          className="border rounded p-2 text-sm bg-gray-800"
         >
           {phonemes.map((p) => (
             <option key={p.id} value={p.id}>
