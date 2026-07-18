@@ -1,12 +1,18 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import { getLanguageOverviewSvc, listLanguagesSvc } from '@/app/lib/languages';
+import { formatRelativeTime } from '@/app/lib/relative-time';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { LanguageOverview } from '@/app/lib/languages';
 
+/** Keys of the numeric count fields in {@link LanguageOverview} — the ones rendered as stat cards. */
+type StatKey = {
+  [K in keyof LanguageOverview]: LanguageOverview[K] extends number ? K : never;
+}[keyof LanguageOverview];
+
 const STAT_CARDS: {
   label: string;
-  key: keyof LanguageOverview;
+  key: StatKey;
   href: string;
 }[] = [
   { label: 'Phonemes', key: 'phonemeCount', href: '/phonemes' },
@@ -22,10 +28,11 @@ const STAT_CARDS: {
 ];
 
 /**
- * Overview/dashboard for a language: stat cards linking into each subroute,
- * or a "start here" prompt in place of the grid when there are no phonemes
- * yet — syllable structures, rules, and word generation are all unusable
- * until at least one phoneme exists.
+ * Overview/dashboard for a language: last-activity line, stat cards linking
+ * into each subroute, and the newest dictionary entries. When there are no
+ * phonemes yet the grid is replaced by a "start here" prompt — syllable
+ * structures, rules, and word generation are all unusable until at least one
+ * phoneme exists.
  */
 export default async function LanguagePage({
   params,
@@ -46,7 +53,12 @@ export default async function LanguagePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">{language.name}</h1>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold">{language.name}</h1>
+        <p className="text-sm text-gray-500">
+          Last activity: {formatRelativeTime(stats.lastActivityAt)}
+        </p>
+      </div>
 
       {stats.phonemeCount === 0 ? (
         <div className="rounded border border-dashed border-gray-300 p-8 text-center">
@@ -75,6 +87,33 @@ export default async function LanguagePage({
             </Link>
           ))}
         </div>
+      )}
+
+      {stats.recentLexemes.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Recently added words</h2>
+            <Link
+              href={`/languages/${id}/dictionary`}
+              className="text-sm text-teal-700 hover:underline"
+            >
+              View dictionary
+            </Link>
+          </div>
+          <ul className="divide-y rounded border">
+            {stats.recentLexemes.map((lexeme) => (
+              <li
+                key={lexeme.id}
+                className="flex items-baseline justify-between p-3"
+              >
+                <span className="font-medium">{lexeme.term}</span>
+                <span className="text-sm text-gray-500">
+                  {formatRelativeTime(lexeme.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );
