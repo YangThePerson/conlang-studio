@@ -9,6 +9,7 @@ import {
   integer,
   check,
   unique,
+  timestamp,
 } from 'drizzle-orm/pg-core';
 import {
   SyllableTemplate,
@@ -21,11 +22,29 @@ import {
 // Tables
 // ---------------------------------------------------------------------------
 
+/**
+ * Audit columns spread into every table. `updated_at` only advances through
+ * Drizzle `db.update(...)` calls (`$onUpdate` is an ORM feature, not a DB
+ * trigger) — SQL run outside the app won't bump it. On join tables, whose rows
+ * are only ever inserted or deleted, `updated_at` never diverges from
+ * `created_at`; it's kept anyway so activity queries can treat tables uniformly.
+ */
+const timestamps = {
+  created_at: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+};
+
 /** App users, one row per Clerk account. Created automatically on first sign-in. */
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   clerk_id: text('clerk_id').notNull().unique(),
   email: text('email').notNull().unique(),
+  ...timestamps,
 });
 
 /** A constructed language owned by a user. All phonology and lexicon data is scoped under this. */
@@ -35,6 +54,7 @@ export const languages = pgTable('languages', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  ...timestamps,
 });
 
 /**
@@ -51,6 +71,7 @@ export const phonemes = pgTable(
     symbol: text('symbol').notNull(),
     ipa: text('ipa').default(''),
     weight: doublePrecision('weight').notNull().default(1),
+    ...timestamps,
   },
   (t) => [unique().on(t.language_id, t.symbol)],
 );
@@ -67,6 +88,7 @@ export const phoneme_groups = pgTable(
       .notNull()
       .references(() => languages.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    ...timestamps,
   },
   (t) => [unique().on(t.language_id, t.name)],
 );
@@ -81,6 +103,7 @@ export const group_memberships = pgTable(
     phoneme_id: uuid('phoneme_id')
       .notNull()
       .references(() => phonemes.id, { onDelete: 'cascade' }),
+    ...timestamps,
   },
   (t) => [primaryKey({ columns: [t.group_id, t.phoneme_id] })],
 );
@@ -96,6 +119,7 @@ export const syllable_structures = pgTable('syllable_structures', {
     .references(() => languages.id, { onDelete: 'cascade' }),
   template: jsonb('template').$type<SyllableTemplate>().notNull(),
   weight: doublePrecision('weight').notNull().default(1.0),
+  ...timestamps,
 });
 
 /**
@@ -126,6 +150,7 @@ export const rules = pgTable(
       .references(() => phonemes.id, { onDelete: 'restrict' }),
     left_context: jsonb('left_context').$type<RuleContext>().notNull(),
     right_context: jsonb('right_context').$type<RuleContext>().notNull(),
+    ...timestamps,
   },
   (t) => [
     // Exactly one of phoneme/group target is set.
@@ -152,6 +177,7 @@ export const lexemes = pgTable(
     term: text('term').notNull(),
     notes: text('notes'),
     origin: text('origin').notNull().default('manual').$type<LexemeOrigin>(),
+    ...timestamps,
   },
   (t) => [
     check(
@@ -172,6 +198,7 @@ export const senses = pgTable('senses', {
     .references(() => lexemes.id, { onDelete: 'cascade' }),
   part_of_speech: text('part_of_speech').notNull(),
   definition: text('definition').notNull(),
+  ...timestamps,
 });
 
 /** User-defined labels for categorizing lexemes within a language (e.g. "body parts", "verbs"). */
@@ -183,6 +210,7 @@ export const tags = pgTable(
       .notNull()
       .references(() => languages.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    ...timestamps,
   },
   (t) => [unique().on(t.language_id, t.name)],
 );
@@ -197,6 +225,7 @@ export const lexeme_tags = pgTable(
     tag_id: uuid('tag_id')
       .notNull()
       .references(() => tags.id, { onDelete: 'cascade' }),
+    ...timestamps,
   },
   (t) => [primaryKey({ columns: [t.lexeme_id, t.tag_id] })],
 );

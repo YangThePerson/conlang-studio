@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, desc, eq, max } from 'drizzle-orm';
 import { db } from '@/app/db';
 import {
   languages,
@@ -6,6 +6,7 @@ import {
   phoneme_groups,
   phonemes,
   rules,
+  senses,
   syllable_structures,
   tags,
   users,
@@ -18,7 +19,18 @@ import { parseAndRequireOwnedLanguage } from './ownership';
 type Language = typeof languages.$inferSelect;
 type DbUser = typeof users.$inferSelect;
 
-/** Row counts for the Overview page's stat cards — one per child table of a language. */
+/** A newly added dictionary entry shown in the Overview page's recent-words list. */
+export type RecentLexeme = {
+  id: string;
+  term: string;
+  created_at: Date;
+};
+
+/**
+ * Data for the Overview page: row counts for the stat cards (one per child
+ * table of a language), the most recent activity timestamp, and the newest
+ * dictionary entries.
+ */
 export type LanguageOverview = {
   phonemeCount: number;
   groupCount: number;
@@ -26,7 +38,20 @@ export type LanguageOverview = {
   ruleCount: number;
   lexemeCount: number;
   tagCount: number;
+  /**
+   * Latest `updated_at` across the language row, its counted child tables, and
+   * senses (definition edits are routine dictionary work, so they count as
+   * activity even though senses have no stat card). Join-table changes
+   * (group membership, lexeme tagging) and deletions intentionally don't bump
+   * this — a deleted row leaves no timestamp behind.
+   */
+  lastActivityAt: Date;
+  /** The newest lexemes by `created_at`, capped at {@link RECENT_LEXEME_LIMIT}. */
+  recentLexemes: RecentLexeme[];
 };
+
+/** How many newest words the Overview's recent-words list shows. */
+const RECENT_LEXEME_LIMIT = 5;
 
 /**
  * Returns all languages owned by the given user.
@@ -36,10 +61,11 @@ export async function listLanguagesSvc(user: DbUser): Promise<Language[]> {
 }
 
 /**
- * Returns row counts across a language's child tables for the Overview page's
- * stat cards. Uses `count(*)` per table rather than the existing `list*Svc`
+ * Returns the Overview page's data: per-child-table row counts, the language's
+ * last-activity timestamp, and its newest dictionary entries. Uses `count(*)` /
+ * `max(updated_at)` aggregates per table rather than the existing `list*Svc`
  * functions, which return full rows (JSONB templates, joined senses/tags) —
- * wasteful when only a length is needed.
+ * wasteful when only counts and timestamps are needed.
  * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
  */
 export async function getLanguageOverviewSvc(
@@ -51,30 +77,62 @@ export async function getLanguageOverviewSvc(
 
   const languageId = lang.data.id;
   const [
-    [{ value: phonemeCount }],
-    [{ value: groupCount }],
-    [{ value: syllableStructureCount }],
-    [{ value: ruleCount }],
-    [{ value: lexemeCount }],
-    [{ value: tagCount }],
+    [phonemeAgg],
+    [groupAgg],
+    [syllableStructureAgg],
+    [ruleAgg],
+    [lexemeAgg],
+    [tagAgg],
+    [senseAgg],
+    recentLexemes,
   ] = await Promise.all([
-    db.select({ value: count() }).from(phonemes).where(eq(phonemes.language_id, languageId)),
-    db.select({ value: count() }).from(phoneme_groups).where(eq(phoneme_groups.language_id, languageId)),
-    db.select({ value: count() }).from(syllable_structures).where(eq(syllable_structures.language_id, languageId)),
-    db.select({ value: count() }).from(rules).where(eq(rules.language_id, languageId)),
-    db.select({ value: count() }).from(lexemes).where(eq(lexemes.language_id, languageId)),
-    db.select({ value: count() }).from(tags).where(eq(tags.language_id, languageId)),
+    db.select({ value: count(), latest: max(phonemes.updated_at) }).from(phonemes).where(eq(phonemes.language_id, languageId)),
+    db.select({ value: count(), latest: max(phoneme_groups.updated_at) }).from(phoneme_groups).where(eq(phoneme_groups.language_id, languageId)),
+    db.select({ value: count(), latest: max(syllable_structures.updated_at) }).from(syllable_structures).where(eq(syllable_structures.language_id, languageId)),
+    db.select({ value: count(), latest: max(rules.updated_at) }).from(rules).where(eq(rules.language_id, languageId)),
+    db.select({ value: count(), latest: max(lexemes.updated_at) }).from(lexemes).where(eq(lexemes.language_id, languageId)),
+    db.select({ value: count(), latest: max(tags.updated_at) }).from(tags).where(eq(tags.language_id, languageId)),
+    // Senses have no stat card, but definition edits are dictionary activity;
+    // scoped to the language through their parent lexeme.
+    db
+      .select({ value: count(), latest: max(senses.updated_at) })
+      .from(senses)
+      .innerJoin(lexemes, eq(senses.lexeme_id, lexemes.id))
+      .where(eq(lexemes.language_id, languageId)),
+    db
+      .select({ id: lexemes.id, term: lexemes.term, created_at: lexemes.created_at })
+      .from(lexemes)
+      .where(eq(lexemes.language_id, languageId))
+      .orderBy(desc(lexemes.created_at))
+      .limit(RECENT_LEXEME_LIMIT),
   ]);
+
+  // The language row's own updated_at (bumped by renames) is the floor, so
+  // lastActivityAt is always defined even with no child rows.
+  const lastActivityAt = [
+    phonemeAgg.latest,
+    groupAgg.latest,
+    syllableStructureAgg.latest,
+    ruleAgg.latest,
+    lexemeAgg.latest,
+    tagAgg.latest,
+    senseAgg.latest,
+  ].reduce<Date>(
+    (latest, candidate) => (candidate && candidate > latest ? candidate : latest),
+    lang.data.updated_at,
+  );
 
   return {
     ok: true,
     data: {
-      phonemeCount,
-      groupCount,
-      syllableStructureCount,
-      ruleCount,
-      lexemeCount,
-      tagCount,
+      phonemeCount: phonemeAgg.value,
+      groupCount: groupAgg.value,
+      syllableStructureCount: syllableStructureAgg.value,
+      ruleCount: ruleAgg.value,
+      lexemeCount: lexemeAgg.value,
+      tagCount: tagAgg.value,
+      lastActivityAt,
+      recentLexemes,
     },
   };
 }
