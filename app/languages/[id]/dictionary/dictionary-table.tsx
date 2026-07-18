@@ -634,7 +634,39 @@ function LexemeEntry({
 
 type OriginFilter = 'all' | 'manual' | 'generated';
 type FitFilter = 'all' | 'fits' | 'violates';
-type Sort = 'term-asc' | 'term-desc' | 'default';
+type Sort =
+  | 'term-asc'
+  | 'term-desc'
+  | 'created-desc'
+  | 'created-asc'
+  | 'updated-desc'
+  | 'updated-asc'
+  | 'default';
+
+/**
+ * One comparator per non-default sort. Date sorts fall back to term order for
+ * equal timestamps — every row that predates the timestamp columns carries the
+ * same backfilled value, so without a tiebreak their order would be arbitrary.
+ */
+const COMPARATORS: Record<
+  Exclude<Sort, 'default'>,
+  (a: CompleteLexeme, b: CompleteLexeme) => number
+> = {
+  'term-asc': (a, b) => a.term.localeCompare(b.term),
+  'term-desc': (a, b) => b.term.localeCompare(a.term),
+  'created-desc': (a, b) =>
+    b.created_at.getTime() - a.created_at.getTime() ||
+    a.term.localeCompare(b.term),
+  'created-asc': (a, b) =>
+    a.created_at.getTime() - b.created_at.getTime() ||
+    a.term.localeCompare(b.term),
+  'updated-desc': (a, b) =>
+    b.updated_at.getTime() - a.updated_at.getTime() ||
+    a.term.localeCompare(b.term),
+  'updated-asc': (a, b) =>
+    a.updated_at.getTime() - b.updated_at.getTime() ||
+    a.term.localeCompare(b.term),
+};
 
 /** Case-insensitive substring match against any searchable field of an entry. */
 function matchesQuery(lexeme: CompleteLexeme, query: string): boolean {
@@ -774,6 +806,18 @@ function DictionaryControls({
           <option className="bg-black" value="term-desc">
             Term Z→A
           </option>
+          <option className="bg-black" value="created-desc">
+            Newest first
+          </option>
+          <option className="bg-black" value="created-asc">
+            Oldest first
+          </option>
+          <option className="bg-black" value="updated-desc">
+            Recently updated
+          </option>
+          <option className="bg-black" value="updated-asc">
+            Least recently updated
+          </option>
           <option className="bg-black" value="default">
             Original order
           </option>
@@ -829,8 +873,7 @@ export default function DictionaryTable({
           lexeme.fits_phonotactics === (fitFilter === 'fits')),
     );
     if (sort === 'default') return filtered;
-    const direction = sort === 'term-asc' ? 1 : -1;
-    return filtered.sort((a, b) => direction * a.term.localeCompare(b.term));
+    return filtered.sort(COMPARATORS[sort]);
   }, [dictionary, query, effectiveTagFilter, originFilter, fitFilter, sort]);
 
   return (
