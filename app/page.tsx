@@ -41,7 +41,7 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col flex-1 items-center">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center gap-12 py-24 px-6">
+      <main className="flex flex-1 w-full max-w-3xl flex-col items-center gap-12 py-18 px-6">
         <div className="flex flex-col gap-4 items-center text-center">
           <h1 className="text-4xl font-bold">
             Design constructed languages, end to end.
@@ -71,13 +71,25 @@ export default async function Home() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-          {FEATURES.map(({ label, description }) => (
-            <Card key={label} className="p-4 gap-1">
+          {FEATURES.map(({ label, description }, index) => (
+            <Card
+              key={label}
+              className={
+                index === FEATURES.length - 1 && FEATURES.length % 2 === 1
+                  ? 'p-4 gap-1 sm:col-span-2 sm:w-1/2 sm:mx-auto'
+                  : 'p-4 gap-1'
+              }
+            >
               <CardTitle>{label}</CardTitle>
               <CardDescription>{description}</CardDescription>
             </Card>
           ))}
         </div>
+
+        <p className="text-muted-foreground max-w-xl">
+          Nothing is pre-built: you define every sound, syllable shape, and rule
+          yourself, then generate words that follow them.
+        </p>
       </main>
     </div>
   );
