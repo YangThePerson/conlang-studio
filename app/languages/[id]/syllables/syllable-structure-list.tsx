@@ -405,7 +405,9 @@ export default function SyllableStructureList({
       />
       {initialStructures.length === 0 ? (
         <p className="text-muted-foreground">
-          No syllable structures yet. Add one above.
+          No syllable structures yet. Structures describe the shapes a syllable
+          can take, built from your phonemes and groups; this is what the word
+          generator draws from.
         </p>
       ) : (
         <ul className="space-y-2">

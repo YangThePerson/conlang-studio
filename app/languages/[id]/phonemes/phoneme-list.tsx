@@ -31,7 +31,12 @@ function PhonemeRow({
       prev: Awaited<ReturnType<typeof updatePhoneme>> | null,
       formData: FormData,
     ) => {
-      const result = await updatePhoneme(languageId, phoneme.id, prev, formData);
+      const result = await updatePhoneme(
+        languageId,
+        phoneme.id,
+        prev,
+        formData,
+      );
       if (result.ok) setIsEditing(false);
       return result;
     },
@@ -206,7 +211,11 @@ export default function PhonemeList({
     <div>
       <AddPhonemeForm languageId={languageId} />
       {initialPhonemes.length === 0 ? (
-        <p className="text-muted-foreground">No phonemes yet. Add one above.</p>
+        <p className="text-muted-foreground">
+          No phonemes yet. Start here. Phonemes are the raw sounds of your
+          language, and everything downstream (groups, syllable shapes, rules,
+          generated words) is built from what you add.
+        </p>
       ) : (
         <ul className="space-y-2">
           {[...initialPhonemes]
