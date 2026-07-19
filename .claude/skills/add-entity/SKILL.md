@@ -62,6 +62,7 @@ return resultResponse(result); // 200; pass 201 for creates, 204 for deletes
 
 - `page.tsx` (Server Component): `getOrCreateDbUser()` → service read → render `Result` (empty/error state on `ok: false`). Reference: the phonemes page.
 - Interactive pieces are `'use client'` leaf components taking data as props and mutating via `useActionState` → action. Reference: `phoneme-list.tsx`.
+- Use the shared primitives in `app/components/ui/` (`Button`, `Input`, `Label`, `Badge`, `Card`) instead of hand-rolled form elements. Colors are theme tokens from `app/globals.css` (`bg-card`, `text-muted-foreground`, `bg-primary`, `<Button variant="destructive">` / `variant="edit"`) — never a literal Tailwind palette class (`bg-gray-800`, `text-teal-500`) for anything brand or interactive.
 - `loading.tsx` for the route.
 - Client-side validation reuses the input schema from `validation.ts` (UX only; server re-validates).
 
