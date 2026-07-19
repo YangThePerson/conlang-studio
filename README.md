@@ -5,7 +5,8 @@ inventory, group sounds, describe syllable shapes, write sound-change rules,
 and generate vocabulary that follows them — then track it all in a
 per-language dictionary.
 
-Live at [conlang-app.vercel.app](https://conlang-app.vercel.app/).
+Live at [conlang-app.vercel.app](https://conlang-app.vercel.app/). The
+day-by-day build process is written up in [DEVLOG.md](DEVLOG.md).
 
 ![Word generator producing candidate words from a syllable template](docs/screenshots/wordgen.png)
 
