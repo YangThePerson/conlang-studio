@@ -1,6 +1,9 @@
 'use client';
 
-import { phonemes as phonemesTable, rules as rulesTable } from '@/app/db/schema';
+import {
+  phonemes as phonemesTable,
+  rules as rulesTable,
+} from '@/app/db/schema';
 import type { RuleContext } from '@/app/db/json-shapes';
 import type { PhonemeGroupWithMembers } from '@/app/lib/phoneme-groups';
 import { formatRule, formatSlot } from '@/app/lib/rule-notation';
@@ -171,7 +174,9 @@ function RuleRow({
         pending={editPending}
         state={editState}
         mode="Edit"
-        initialTargetKind={rule.target_phoneme_id !== null ? 'phoneme' : 'group'}
+        initialTargetKind={
+          rule.target_phoneme_id !== null ? 'phoneme' : 'group'
+        }
         initialTargetId={rule.target_phoneme_id ?? rule.target_group_id ?? ''}
         initialOutputId={rule.output_phoneme_id}
         initialLeftContext={rule.left_context}
@@ -212,7 +217,9 @@ function RuleRow({
           {formatRule(rule, phonemeSymbolById, groupNameById)}
         </p>
         {deleteState && !deleteState.ok && (
-          <p className="text-sm text-red-400">{formErrorMessage(deleteState)}</p>
+          <p className="text-sm text-red-400">
+            {formErrorMessage(deleteState)}
+          </p>
         )}
       </div>
       <div className="flex gap-2">
@@ -447,9 +454,7 @@ function RuleForm({
 
   function switchTargetKind(kind: TargetKind) {
     setTargetKind(kind);
-    setTargetId(
-      (kind === 'phoneme' ? phonemes[0]?.id : groups[0]?.id) ?? '',
-    );
+    setTargetId((kind === 'phoneme' ? phonemes[0]?.id : groups[0]?.id) ?? '');
   }
 
   const targetOptions = targetKind === 'phoneme' ? phonemes : groups;
@@ -629,25 +634,30 @@ export default function RuleList({
       />
       {rules.length === 0 ? (
         <p className="text-muted-foreground">
-          No rules yet. Rules rewrite one sound into another when its
-          neighbors match — add one above.
+          No rules yet. Rules rewrite one sound into another when its neighbors
+          match — add one above.
         </p>
       ) : (
-        <ul className="space-y-2">
-          {rules.map((rule, idx) => (
-            <RuleRow
-              key={rule.id}
-              languageId={languageId}
-              rule={rule}
-              isFirst={idx === 0}
-              isLast={idx === rules.length - 1}
-              phonemes={phonemes}
-              groups={groups}
-              phonemeSymbolById={phonemeSymbolById}
-              groupNameById={groupNameById}
-            />
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-2">
+            {rules.map((rule, idx) => (
+              <RuleRow
+                key={rule.id}
+                languageId={languageId}
+                rule={rule}
+                isFirst={idx === 0}
+                isLast={idx === rules.length - 1}
+                phonemes={phonemes}
+                groups={groups}
+                phonemeSymbolById={phonemeSymbolById}
+                groupNameById={groupNameById}
+              />
+            ))}
+          </ul>
+          <p className="text-muted-foreground py-2">
+            Rules apply once, in order, top to bottom.
+          </p>
+        </>
       )}
     </div>
   );
