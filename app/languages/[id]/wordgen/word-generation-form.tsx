@@ -90,27 +90,37 @@ function WordGenControls({
     );
 
   return (
-    <form className="flex-1 p-4 flex flex-col gap-2 items-center">
-      <Label className="font-normal">
-        Min Syllables:
+    <form className="flex-1 p-4 flex flex-col gap-4 items-center">
+      <div className="grid grid-cols-[auto_auto] items-center gap-x-3 gap-y-3">
+        <Label
+          htmlFor="minSyllables"
+          className="font-normal justify-self-start"
+        >
+          Min Syllables:
+        </Label>
         <Input
+          id="minSyllables"
           className="text-center w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           type="number"
           defaultValue={minSyllables}
           onChange={(e) => setMinSyllables(Number(e.currentTarget.value))}
           min={1}
         />
-      </Label>
-      <Label className="font-normal">
-        Max Syllables:
+        <Label
+          htmlFor="maxSyllables"
+          className="font-normal justify-self-start"
+        >
+          Max Syllables:
+        </Label>
         <Input
+          id="maxSyllables"
           className="text-center w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           type="number"
           defaultValue={maxSyllables}
           onChange={(e) => setMaxSyllables(Number(e.currentTarget.value))}
           min={1}
         />
-      </Label>
+      </div>
       <Button
         type="button"
         onClick={generateWordsTransition}
@@ -169,7 +179,9 @@ function WordPanel({
   if (!words.length)
     return (
       <div className="flex-2 py-4 px-16 rounded-lg border bg-card flex flex-col justify-center items-center gap-4">
-        <p className="text-muted-foreground">No words have been generated yet.</p>
+        <p className="text-muted-foreground">
+          No words have been generated yet.
+        </p>
       </div>
     );
 
