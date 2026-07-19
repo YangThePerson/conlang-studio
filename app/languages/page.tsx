@@ -14,9 +14,11 @@ export default async function LanguagesPage() {
   const langs = await listLanguagesSvc(user);
 
   return (
-    <main className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">My Languages</h1>
-      <LanguageList languages={langs} />
-    </main>
+    <div className="flex flex-col flex-1 items-center">
+      <main className="flex flex-1 w-full max-w-3xl flex-col gap-5 py-10 px-20 items-stretch">
+        <h1 className="text-2xl font-bold mb-6 text-center">My Languages</h1>
+        <LanguageList languages={langs} />
+      </main>
+    </div>
   );
 }
