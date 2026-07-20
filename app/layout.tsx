@@ -3,6 +3,8 @@ import { Geist, Geist_Mono, Noto_Sans_Mono } from 'next/font/google';
 import Link from 'next/link';
 import './globals.css';
 import { Button } from '@/app/components/ui/button';
+import { ThemeProvider } from '@/app/components/theme/theme-provider';
+import { ThemeToggle } from '@/app/components/theme/theme-toggle';
 import {
   ClerkProvider,
   Show,
@@ -38,35 +40,38 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansMono.variable} antialiased flex flex-col min-h-screen`}
       >
-        <ClerkProvider>
-          <header className="shrink-0 sticky top-0 z-40 flex justify-between items-center p-4 gap-4 h-16 bg-[#0a0d08] text-white border-b">
-            <Link href="/" className="font-semibold hover:text-primary">
-              Conlang Studio
-            </Link>
-            <div className="flex items-center gap-4">
-              <Show when="signed-out">
-                <SignInButton />
-                <SignUpButton>
-                  <Button className="rounded-full">Sign Up</Button>
-                </SignUpButton>
-              </Show>
-              <Show when="signed-in">
-                <Link
-                  href="/languages"
-                  className="text-sm font-medium hover:text-primary"
-                >
-                  Languages
-                </Link>
-                <UserButton />
-              </Show>
-            </div>
-          </header>
-          {children}
-        </ClerkProvider>
+        <ThemeProvider>
+          <ClerkProvider>
+            <header className="shrink-0 sticky top-0 z-40 flex justify-between items-center p-4 gap-4 h-16 bg-card text-card-foreground border-b">
+              <Link href="/" className="font-semibold hover:text-primary">
+                Conlang Studio
+              </Link>
+              <div className="flex items-center gap-4">
+                <Show when="signed-out">
+                  <SignInButton />
+                  <SignUpButton>
+                    <Button className="rounded-full">Sign Up</Button>
+                  </SignUpButton>
+                </Show>
+                <Show when="signed-in">
+                  <Link
+                    href="/languages"
+                    className="text-sm font-medium hover:text-primary"
+                  >
+                    Languages
+                  </Link>
+                  <UserButton />
+                </Show>
+                <ThemeToggle />
+              </div>
+            </header>
+            {children}
+          </ClerkProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

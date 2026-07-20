@@ -19,7 +19,7 @@ export default function SideBar({ languageId }: { languageId: string }) {
   return (
     <aside
       className={`
-        inset-y-0 left-0 w-64 transform bg-[#0a0d08] text-white shadow-xl
+        inset-y-0 left-0 w-64 transform bg-card text-card-foreground border-r shadow-xl
         transition-transform duration-300 ease-in-out
         static translate-x-0 z-auto
       `}
