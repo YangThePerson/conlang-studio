@@ -22,7 +22,8 @@ const FEATURES: { label: string; description: string }[] = [
   },
   {
     label: 'Dictionary',
-    description: 'Track vocabulary with definitions, tags, and word origins.',
+    description:
+      'Track vocabulary with definitions, tags, and individual notes.',
   },
   {
     label: 'Word Generator',
