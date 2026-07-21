@@ -9,7 +9,7 @@ import { db } from '../db';
 import { and, eq, inArray } from 'drizzle-orm';
 import { notFound, validationMessage, type Result } from './result';
 import { parseInput } from './parse';
-import { parseAndRequireOwnedLanguage } from './ownership';
+import { parseAndRequireVisibleLanguage } from './ownership';
 import { applyRules, type WordToken } from './rule-apply';
 import { loadCompiledRules } from './rules';
 
@@ -255,8 +255,10 @@ export function generateWordSet(
 }
 
 /**
- * Generates a set of unique random words for a language owned by `user`.
- * `rawLanguageId` and `rawInput` are untrusted — schema validation and ownership are enforced here.
+ * Generates a set of unique random words for a language owned by `user` or
+ * public (`user` may be `null` for an anonymous visitor — generation performs
+ * no DB write, so it's safe to open up alongside the other reads).
+ * `rawLanguageId` and `rawInput` are untrusted — schema validation and visibility are enforced here.
  *
  * `data.words` may contain fewer entries than `data.requested` if the phonological space is too
  * constrained to produce that many unique words within 10× `wordsToGenerate` generation attempts
@@ -272,7 +274,7 @@ export function generateWordSet(
  * post-rule surface forms and uniqueness is defined over those.
  */
 export async function generateWordSvc(
-  user: DbUser,
+  user: DbUser | null,
   rawLanguageId: unknown,
   rawInput: unknown,
   seed?: number,
@@ -288,7 +290,7 @@ export async function generateWordSvc(
       'The minimum amount of syllables cannot exceed the maximum amount.',
     );
 
-  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  const lang = await parseAndRequireVisibleLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
   const parsedStructures = await db

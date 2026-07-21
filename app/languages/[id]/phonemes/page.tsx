@@ -1,5 +1,6 @@
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { parseAndRequireVisibleLanguage } from '@/app/lib/ownership';
 import { listPhonemesSvc } from '@/app/lib/phonemes';
 import { listPhonemeGroupsWithMembersSvc } from '@/app/lib/phoneme-groups';
 import PhonemeList from './phoneme-list';
@@ -12,19 +13,26 @@ export default async function PhonemesPage({
   const { id } = await params;
 
   const user = await getOrCreateDbUser();
-  if (!user) redirect('/sign-in');
+
+  const langResult = await parseAndRequireVisibleLanguage(user, id);
+  if (!langResult.ok) notFound();
+  const canEdit = user !== null && langResult.data.user_id === user.id;
 
   const phonemesResult = await listPhonemesSvc(user, id);
-  if (!phonemesResult.ok) redirect('/languages');
+  if (!phonemesResult.ok) notFound();
 
   const groupsResult = await listPhonemeGroupsWithMembersSvc(user, id);
-  if (!groupsResult.ok) redirect('/languages');
+  if (!groupsResult.ok) notFound();
 
   return (
     <div className="flex flex-col gap-10">
       <section>
         <h1 className="text-2xl font-semibold mb-6">Phonemes</h1>
-        <PhonemeList phonemes={phonemesResult.data} languageId={id} />
+        <PhonemeList
+          phonemes={phonemesResult.data}
+          languageId={id}
+          canEdit={canEdit}
+        />
       </section>
       <section>
         <h1 className="text-2xl font-semibold mb-6">Groups</h1>
@@ -32,6 +40,7 @@ export default async function PhonemesPage({
           languageId={id}
           groups={groupsResult.data}
           phonemes={phonemesResult.data}
+          canEdit={canEdit}
         />
       </section>
     </div>

@@ -13,6 +13,9 @@ type Lexeme = typeof lexemes.$inferSelect;
  * Server Action: generates a set of random words for the language's syllable structures.
  * No seed is passed, so `generateWordSvc` uses `Math.random` — output is non-deterministic,
  * matching the "Generate" button's expected behavior of a fresh list each click.
+ * Unlike other actions, `user` may be `null` here — generation is read-only (no DB write),
+ * so it's allowed for anonymous visitors of a public language; `generateWordSvc` enforces
+ * visibility itself.
  */
 export async function generateWords(
   languageId: string,
@@ -22,7 +25,6 @@ export async function generateWords(
   maxSyllables: number,
 ): Promise<Result<{ words: Set<string>; requested: number }>> {
   const user = await getOrCreateDbUser();
-  if (!user) return { ok: false, kind: 'unauthorized' };
 
   const result = await generateWordSvc(user, languageId, {
     wordsToGenerate,

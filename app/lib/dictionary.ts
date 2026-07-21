@@ -16,7 +16,11 @@ import {
 } from '../db/validation';
 import { notFound, type Result } from './result';
 import { parseUuid, parseInput } from './parse';
-import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
+import {
+  ownedLanguageIds,
+  parseAndRequireOwnedLanguage,
+  parseAndRequireVisibleLanguage,
+} from './ownership';
 import { compilePhonotacticsMatcher } from './phonotactics';
 import { loadLiteralTemplates } from './wordgen';
 
@@ -54,14 +58,15 @@ function ownedLexemeIds(user: DbUser) {
  * Returns all lexemes for a language including senses, tags, and a
  * `fits_phonotactics` flag (see {@link CheckedLexeme} — legality is checked
  * against ALL of the language's syllable structures, unlike generation which
- * uses a user-selected subset), verifying that the language is owned by `user`.
- * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
+ * uses a user-selected subset), verifying that the language is owned by
+ * `user` or is public (`user` may be `null` for an anonymous visitor).
+ * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or is neither public nor owned by `user`.
  */
 export async function getDictionarySvc(
-  user: DbUser,
+  user: DbUser | null,
   rawLanguageId: unknown,
 ): Promise<Result<CheckedLexeme[]>> {
-  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  const lang = await parseAndRequireVisibleLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
   const [rows, structures] = await Promise.all([

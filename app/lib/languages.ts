@@ -14,7 +14,7 @@ import {
 import { createLanguageInputSchema, updateLanguageInputSchema } from '@/app/db/validation';
 import { notFound, type Result } from './result';
 import { parseUuid, parseInput } from './parse';
-import { parseAndRequireOwnedLanguage } from './ownership';
+import { parseAndRequireVisibleLanguage } from './ownership';
 
 type Language = typeof languages.$inferSelect;
 type DbUser = typeof users.$inferSelect;
@@ -65,14 +65,15 @@ export async function listLanguagesSvc(user: DbUser): Promise<Language[]> {
  * last-activity timestamp, and its newest dictionary entries. Uses `count(*)` /
  * `max(updated_at)` aggregates per table rather than the existing `list*Svc`
  * functions, which return full rows (JSONB templates, joined senses/tags) —
- * wasteful when only counts and timestamps are needed.
- * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
+ * wasteful when only counts and timestamps are needed. Verifies the language
+ * is owned by `user` or is public (`user` may be `null` for an anonymous visitor).
+ * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or is neither public nor owned by `user`.
  */
 export async function getLanguageOverviewSvc(
-  user: DbUser,
+  user: DbUser | null,
   rawLanguageId: unknown,
 ): Promise<Result<LanguageOverview>> {
-  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  const lang = await parseAndRequireVisibleLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
   const languageId = lang.data.id;

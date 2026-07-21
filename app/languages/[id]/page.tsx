@@ -1,7 +1,8 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
-import { getLanguageOverviewSvc, listLanguagesSvc } from '@/app/lib/languages';
+import { getLanguageOverviewSvc } from '@/app/lib/languages';
+import { parseAndRequireVisibleLanguage } from '@/app/lib/ownership';
 import { formatRelativeTime } from '@/app/lib/relative-time';
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { LanguageOverview } from '@/app/lib/languages';
 import { Button } from '@/app/components/ui/button';
@@ -41,14 +42,13 @@ export default async function LanguagePage({
   const { id } = await params;
 
   const user = await getOrCreateDbUser();
-  if (!user) redirect('/sign-in');
 
-  const languages = await listLanguagesSvc(user);
-  const language = languages.find(({ id: languageId }) => languageId === id);
-  if (!language) redirect('/languages');
+  const langResult = await parseAndRequireVisibleLanguage(user, id);
+  if (!langResult.ok) notFound();
+  const language = langResult.data;
 
   const overview = await getLanguageOverviewSvc(user, id);
-  if (!overview.ok) redirect('/languages');
+  if (!overview.ok) notFound();
 
   const stats = overview.data;
 

@@ -17,6 +17,7 @@ import {
   isUniqueViolation,
   ownedLanguageIds,
   parseAndRequireOwnedLanguage,
+  parseAndRequireVisibleLanguage,
 } from './ownership';
 import { isReferencedInSyllableTemplates } from './syllables';
 import { isReferencedInRules } from './rules';
@@ -47,15 +48,15 @@ function duplicateGroupNameResult() {
 
 /**
  * Returns all phoneme groups for a language with their member phonemes, verifying that
- * the language is owned by `user`. Uses a single relational query rather than separate
- * group and membership fetches.
- * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
+ * the language is owned by `user` or is public (`user` may be `null` for an anonymous
+ * visitor). Uses a single relational query rather than separate group and membership fetches.
+ * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or is neither public nor owned by `user`.
  */
 export async function listPhonemeGroupsWithMembersSvc(
-  user: DbUser,
+  user: DbUser | null,
   rawLanguageId: unknown,
 ): Promise<Result<PhonemeGroupWithMembers[]>> {
-  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  const lang = await parseAndRequireVisibleLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
   const rows = await db.query.phoneme_groups.findMany({

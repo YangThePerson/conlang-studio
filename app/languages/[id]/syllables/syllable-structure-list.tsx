@@ -89,11 +89,13 @@ function SyllableStructureRow({
   structure,
   phonemes,
   groups,
+  canEdit,
 }: {
   languageId: string;
   structure: SyllableStructure;
   phonemes: Phoneme[];
   groups: PhonemeGroupWithMembers[];
+  canEdit: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -147,27 +149,29 @@ function SyllableStructureRow({
         </p>
         <p className="flex-1 font-mono">Weight: {structure.weight}</p>
       </div>
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="edit"
-          onClick={() => setIsEditing(true)}
-          disabled={deletePending}
-          className="w-32"
-        >
-          Edit
-        </Button>
-        <form action={deleteAction}>
+      {canEdit && (
+        <div className="flex gap-2">
           <Button
-            type="submit"
-            variant="destructive"
+            type="button"
+            variant="edit"
+            onClick={() => setIsEditing(true)}
             disabled={deletePending}
             className="w-32"
           >
-            Delete
+            Edit
           </Button>
-        </form>
-      </div>
+          <form action={deleteAction}>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={deletePending}
+              className="w-32"
+            >
+              Delete
+            </Button>
+          </form>
+        </div>
+      )}
     </li>
   );
 }
@@ -390,19 +394,23 @@ export default function SyllableStructureList({
   phonemes,
   groups,
   structures: initialStructures,
+  canEdit,
 }: {
   languageId: string;
   phonemes: Phoneme[];
   groups: PhonemeGroupWithMembers[];
   structures: SyllableStructure[];
+  canEdit: boolean;
 }) {
   return (
     <div>
-      <AddSyllableStructureForm
-        languageId={languageId}
-        phonemes={phonemes}
-        groups={groups}
-      />
+      {canEdit && (
+        <AddSyllableStructureForm
+          languageId={languageId}
+          phonemes={phonemes}
+          groups={groups}
+        />
+      )}
       {initialStructures.length === 0 ? (
         <p className="text-muted-foreground">
           No syllable structures yet. Structures describe the shapes a syllable
@@ -418,6 +426,7 @@ export default function SyllableStructureList({
               structure={s}
               groups={groups}
               phonemes={phonemes}
+              canEdit={canEdit}
             />
           ))}
         </ul>

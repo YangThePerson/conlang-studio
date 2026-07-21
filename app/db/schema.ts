@@ -7,6 +7,7 @@ import {
   primaryKey,
   jsonb,
   integer,
+  boolean,
   check,
   unique,
   timestamp,
@@ -54,6 +55,12 @@ export const languages = pgTable('languages', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  /**
+   * When true, the language is readable by anyone (owner-only writes still
+   * apply) — used for the hand-authored public demo language. Never
+   * client-settable; only ever flipped by a direct DB update.
+   */
+  is_public: boolean('is_public').notNull().default(false),
   ...timestamps,
 });
 

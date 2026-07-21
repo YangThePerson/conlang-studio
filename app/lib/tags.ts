@@ -12,6 +12,7 @@ import {
   isUniqueViolation,
   ownedLanguageIds,
   parseAndRequireOwnedLanguage,
+  parseAndRequireVisibleLanguage,
 } from './ownership';
 
 type Tag = typeof tags.$inferSelect;
@@ -31,15 +32,16 @@ function duplicateTagNameResult() {
 
 /**
  * Returns all tags for a language, name-sorted, verifying that the language
- * is owned by `user`. Used for the tag manager panel and the per-lexeme
- * attach picker — the dictionary read (`getDictionarySvc`) only returns tags
- * already attached to a lexeme, not the full language inventory.
+ * is owned by `user` or is public (`user` may be `null` for an anonymous
+ * visitor). Used for the tag manager panel and the per-lexeme attach picker —
+ * the dictionary read (`getDictionarySvc`) only returns tags already attached
+ * to a lexeme, not the full language inventory.
  */
 export async function listTagsSvc(
-  user: DbUser,
+  user: DbUser | null,
   rawLanguageId: unknown,
 ): Promise<Result<Tag[]>> {
-  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  const lang = await parseAndRequireVisibleLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
   const rows = await db

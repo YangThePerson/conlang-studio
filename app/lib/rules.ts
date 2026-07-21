@@ -16,7 +16,11 @@ import {
 } from '../db/validation';
 import { notFound, validationMessage, type Result } from './result';
 import { parseInput, parseUuid } from './parse';
-import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
+import {
+  ownedLanguageIds,
+  parseAndRequireOwnedLanguage,
+  parseAndRequireVisibleLanguage,
+} from './ownership';
 
 type DbUser = typeof users.$inferSelect;
 type Rule = typeof rules.$inferSelect;
@@ -197,15 +201,16 @@ export async function loadCompiledRules(
 
 /**
  * Returns all rules for a language in application order, verifying that the
- * language is owned by `user`. Ordered by `position` with `id` as a
- * deterministic tie-break (positions can't collide via the move operation,
- * but the ordering costs nothing to make total).
+ * language is owned by `user` or is public (`user` may be `null` for an
+ * anonymous visitor). Ordered by `position` with `id` as a deterministic
+ * tie-break (positions can't collide via the move operation, but the
+ * ordering costs nothing to make total).
  */
 export async function listRulesSvc(
-  user: DbUser,
+  user: DbUser | null,
   rawLanguageId: unknown,
 ): Promise<Result<Rule[]>> {
-  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  const lang = await parseAndRequireVisibleLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
   const rows = await db

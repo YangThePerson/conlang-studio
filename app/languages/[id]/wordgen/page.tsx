@@ -1,11 +1,14 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { parseAndRequireVisibleLanguage } from '@/app/lib/ownership';
 import { listSyllableStructuresSvc } from '@/app/lib/syllables';
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import WordGenerationForm from './word-generation-form';
 
 /**
  * Server Component: loads the language's syllable structures and hands them to the
- * client-side generation form.
+ * client-side generation form. Generation itself is allowed for anonymous
+ * visitors of a public language (no DB write); only banking a word to the
+ * dictionary is owner-only, gated client-side via `canEdit`.
  */
 export default async function WordgenPage({
   params,
@@ -13,12 +16,19 @@ export default async function WordgenPage({
   const { id } = await params;
 
   const user = await getOrCreateDbUser();
-  if (!user) redirect('/sign-in');
+
+  const langResult = await parseAndRequireVisibleLanguage(user, id);
+  if (!langResult.ok) notFound();
+  const canEdit = user !== null && langResult.data.user_id === user.id;
 
   const syllableStructures = await listSyllableStructuresSvc(user, id);
-  if (!syllableStructures.ok) redirect('/languages');
+  if (!syllableStructures.ok) notFound();
 
   return (
-    <WordGenerationForm languageId={id} structures={syllableStructures.data} />
+    <WordGenerationForm
+      languageId={id}
+      structures={syllableStructures.data}
+      canEdit={canEdit}
+    />
   );
 }

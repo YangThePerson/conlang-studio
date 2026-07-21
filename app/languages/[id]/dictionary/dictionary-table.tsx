@@ -514,10 +514,12 @@ function LexemeEntry({
   lexeme,
   isEven,
   allTags,
+  canEdit,
 }: {
   lexeme: CompleteLexeme;
   isEven: boolean;
   allTags: Tag[];
+  canEdit: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -579,32 +581,34 @@ function LexemeEntry({
           {lexeme.tags.map((tag) => tag.name).join(', ') || '—'}
         </td>
         <td rowSpan={lexemeRowSpan} className="py-2">
-          <form className="gap-2 flex flex-wrap" action={deleteAction}>
-            <Button
-              type="button"
-              variant="edit"
-              size="sm"
-              disabled={deletePending}
-              onClick={() => setIsEditing(true)}
-              className="w-24"
-            >
-              Edit
-            </Button>
-            <Button
-              type="submit"
-              variant="destructive"
-              size="sm"
-              disabled={deletePending}
-              className="w-24"
-            >
-              Delete
-            </Button>
-            {deleteError && (
-              <p className="text-red-400 text-sm w-full text-left">
-                {deleteError}
-              </p>
-            )}
-          </form>
+          {canEdit && (
+            <form className="gap-2 flex flex-wrap" action={deleteAction}>
+              <Button
+                type="button"
+                variant="edit"
+                size="sm"
+                disabled={deletePending}
+                onClick={() => setIsEditing(true)}
+                className="w-24"
+              >
+                Edit
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                size="sm"
+                disabled={deletePending}
+                className="w-24"
+              >
+                Delete
+              </Button>
+              {deleteError && (
+                <p className="text-red-400 text-sm w-full text-left">
+                  {deleteError}
+                </p>
+              )}
+            </form>
+          )}
         </td>
       </tr>
       {restSenses.map((sense) => (
@@ -817,10 +821,12 @@ export default function DictionaryTable({
   languageId,
   dictionary,
   allTags,
+  canEdit,
 }: {
   languageId: string;
   dictionary: CompleteLexeme[];
   allTags: Tag[];
+  canEdit: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [tagFilter, setTagFilter] = useState('all');
@@ -852,8 +858,8 @@ export default function DictionaryTable({
 
   return (
     <div className="flex flex-col gap-4">
-      <AddLexemeForm languageId={languageId} />
-      <TagManager languageId={languageId} tags={allTags} />
+      {canEdit && <AddLexemeForm languageId={languageId} />}
+      <TagManager languageId={languageId} tags={allTags} canEdit={canEdit} />
       {dictionary.length === 0 ? (
         <p className="text-muted-foreground">
           No words yet — add one above, or bank some from the word generator.
@@ -885,7 +891,11 @@ export default function DictionaryTable({
                   {dictionary.length === 1 ? 'entry' : 'entries'}
                 </p>
               )}
-              <LexemeTable dictionary={visible} allTags={allTags} />
+              <LexemeTable
+                dictionary={visible}
+                allTags={allTags}
+                canEdit={canEdit}
+              />
             </>
           )}
         </>
@@ -898,9 +908,11 @@ export default function DictionaryTable({
 function LexemeTable({
   dictionary,
   allTags,
+  canEdit,
 }: {
   dictionary: CompleteLexeme[];
   allTags: Tag[];
+  canEdit: boolean;
 }) {
   return (
     <table className="w-full border table-fixed wrap-break-word">
@@ -933,6 +945,7 @@ function LexemeTable({
             key={lexeme.id}
             isEven={i % 2 === 0}
             allTags={allTags}
+            canEdit={canEdit}
           />
         ))}
       </tbody>

@@ -52,7 +52,15 @@ function AddTagForm({ languageId }: { languageId: string }) {
 }
 
 /** One tag row with inline rename and delete — sibling forms, matching `SenseEditRow`. */
-function TagRow({ languageId, tag }: { languageId: string; tag: Tag }) {
+function TagRow({
+  languageId,
+  tag,
+  canEdit,
+}: {
+  languageId: string;
+  tag: Tag;
+  canEdit: boolean;
+}) {
   const [name, setName] = useState(tag.name);
 
   const [renameState, renameAction, renamePending] = useActionState(
@@ -68,6 +76,8 @@ function TagRow({ languageId, tag }: { languageId: string; tag: Tag }) {
     failureMessage(renameState) ??
     failureMessage(deleteState) ??
     fieldError(renameState, 'name');
+
+  if (!canEdit) return <li className="flex items-center">{tag.name}</li>;
 
   return (
     <li className="flex flex-wrap items-end gap-3">
@@ -112,9 +122,11 @@ function TagRow({ languageId, tag }: { languageId: string; tag: Tag }) {
 export default function TagManager({
   languageId,
   tags,
+  canEdit,
 }: {
   languageId: string;
   tags: Tag[];
+  canEdit: boolean;
 }) {
   return (
     <details className="rounded-lg border bg-card p-3">
@@ -125,11 +137,16 @@ export default function TagManager({
         {tags.length > 0 && (
           <ul className="flex flex-col gap-2">
             {tags.map((tag) => (
-              <TagRow key={tag.id} languageId={languageId} tag={tag} />
+              <TagRow
+                key={tag.id}
+                languageId={languageId}
+                tag={tag}
+                canEdit={canEdit}
+              />
             ))}
           </ul>
         )}
-        <AddTagForm languageId={languageId} />
+        {canEdit && <AddTagForm languageId={languageId} />}
       </div>
     </details>
   );

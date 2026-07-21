@@ -8,7 +8,11 @@ import type { SyllableTemplate } from '../db/json-shapes';
 import { db } from '../db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { parseUuid, parseInput } from './parse';
-import { ownedLanguageIds, parseAndRequireOwnedLanguage } from './ownership';
+import {
+  ownedLanguageIds,
+  parseAndRequireOwnedLanguage,
+  parseAndRequireVisibleLanguage,
+} from './ownership';
 import { separateTemplateIds } from './wordgen';
 
 type DbUser = typeof users.$inferSelect;
@@ -81,14 +85,15 @@ export async function isReferencedInSyllableTemplates(
 }
 
 /**
- * Returns all syllable structures for a language, verifying that the language is owned by `user`.
- * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or belongs to another user.
+ * Returns all syllable structures for a language, verifying that the language
+ * is owned by `user` or is public (`user` may be `null` for an anonymous visitor).
+ * Returns `{ ok: false, kind: 'not_found' }` if the language doesn't exist or is neither public nor owned by `user`.
  */
 export async function listSyllableStructuresSvc(
-  user: DbUser,
+  user: DbUser | null,
   rawLanguageId: unknown,
 ): Promise<Result<SyllableStructure[]>> {
-  const lang = await parseAndRequireOwnedLanguage(user, rawLanguageId);
+  const lang = await parseAndRequireVisibleLanguage(user, rawLanguageId);
   if (!lang.ok) return lang;
 
   const rows = await db

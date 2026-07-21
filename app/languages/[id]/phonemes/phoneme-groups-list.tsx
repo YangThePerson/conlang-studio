@@ -118,10 +118,12 @@ function GroupRow({
   languageId,
   group,
   phonemes,
+  canEdit,
 }: {
   languageId: string;
   group: PhonemeGroupWithMembers;
   phonemes: Phoneme[];
+  canEdit: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -179,25 +181,29 @@ function GroupRow({
             : 'None'}
         </p>
       </div>
-      <Button
-        type="button"
-        variant="edit"
-        disabled={deletePending}
-        onClick={() => setIsEditing(true)}
-        className="w-32"
-      >
-        Edit
-      </Button>
-      <form action={deleteAction}>
-        <Button
-          type="submit"
-          variant="destructive"
-          disabled={deletePending}
-          className="w-32"
-        >
-          Delete
-        </Button>
-      </form>
+      {canEdit && (
+        <>
+          <Button
+            type="button"
+            variant="edit"
+            disabled={deletePending}
+            onClick={() => setIsEditing(true)}
+            className="w-32"
+          >
+            Edit
+          </Button>
+          <form action={deleteAction}>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={deletePending}
+              className="w-32"
+            >
+              Delete
+            </Button>
+          </form>
+        </>
+      )}
     </li>
   );
 }
@@ -206,14 +212,16 @@ export default function PhonemeGroupsList({
   languageId,
   groups: initialGroups,
   phonemes,
+  canEdit,
 }: {
   languageId: string;
   groups: PhonemeGroupWithMembers[];
   phonemes: Phoneme[];
+  canEdit: boolean;
 }) {
   return (
     <div>
-      <AddGroupForm languageId={languageId} />
+      {canEdit && <AddGroupForm languageId={languageId} />}
       {initialGroups.length === 0 ? (
         <p className="text-muted-foreground">
           No phoneme groups yet. Add one above.
@@ -228,6 +236,7 @@ export default function PhonemeGroupsList({
                 group={g}
                 languageId={languageId}
                 phonemes={phonemes}
+                canEdit={canEdit}
               />
             ))}
         </ul>

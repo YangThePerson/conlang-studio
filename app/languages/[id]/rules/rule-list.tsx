@@ -126,6 +126,7 @@ function RuleRow({
   groups,
   phonemeSymbolById,
   groupNameById,
+  canEdit,
 }: {
   languageId: string;
   rule: Rule;
@@ -135,6 +136,7 @@ function RuleRow({
   groups: PhonemeGroupWithMembers[];
   phonemeSymbolById: Map<string, string>;
   groupNameById: Map<string, string>;
+  canEdit: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -191,28 +193,30 @@ function RuleRow({
   return (
     <li className="flex items-center gap-2 rounded-lg border bg-card p-3 justify-between">
       <div className="flex items-center gap-3 mx-3 w-full">
-        <div className="flex flex-col">
-          <form action={moveUpAction}>
-            <button
-              type="submit"
-              disabled={isFirst || busy}
-              aria-label="Move rule up"
-              className="px-1 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
-            >
-              ▲
-            </button>
-          </form>
-          <form action={moveDownAction}>
-            <button
-              type="submit"
-              disabled={isLast || busy}
-              aria-label="Move rule down"
-              className="px-1 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
-            >
-              ▼
-            </button>
-          </form>
-        </div>
+        {canEdit && (
+          <div className="flex flex-col">
+            <form action={moveUpAction}>
+              <button
+                type="submit"
+                disabled={isFirst || busy}
+                aria-label="Move rule up"
+                className="px-1 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+              >
+                ▲
+              </button>
+            </form>
+            <form action={moveDownAction}>
+              <button
+                type="submit"
+                disabled={isLast || busy}
+                aria-label="Move rule down"
+                className="px-1 text-muted-foreground enabled:hover:text-foreground disabled:opacity-30 cursor-pointer disabled:cursor-auto"
+              >
+                ▼
+              </button>
+            </form>
+          </div>
+        )}
         <p className="font-mono text-lg">
           {formatRule(rule, phonemeSymbolById, groupNameById)}
         </p>
@@ -222,27 +226,29 @@ function RuleRow({
           </p>
         )}
       </div>
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="edit"
-          onClick={() => setIsEditing(true)}
-          disabled={busy}
-          className="w-32"
-        >
-          Edit
-        </Button>
-        <form action={deleteAction}>
+      {canEdit && (
+        <div className="flex gap-2">
           <Button
-            type="submit"
-            variant="destructive"
+            type="button"
+            variant="edit"
+            onClick={() => setIsEditing(true)}
             disabled={busy}
             className="w-32"
           >
-            Delete
+            Edit
           </Button>
-        </form>
-      </div>
+          <form action={deleteAction}>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={busy}
+              className="w-32"
+            >
+              Delete
+            </Button>
+          </form>
+        </div>
+      )}
     </li>
   );
 }
@@ -608,11 +614,13 @@ export default function RuleList({
   phonemes,
   groups,
   rules,
+  canEdit,
 }: {
   languageId: string;
   phonemes: Phoneme[];
   groups: PhonemeGroupWithMembers[];
   rules: Rule[];
+  canEdit: boolean;
 }) {
   const phonemeSymbolById = useMemo(
     () => new Map(phonemes.map((p) => [p.id, p.symbol])),
@@ -625,13 +633,15 @@ export default function RuleList({
 
   return (
     <div>
-      <AddRuleForm
-        languageId={languageId}
-        phonemes={phonemes}
-        groups={groups}
-        phonemeSymbolById={phonemeSymbolById}
-        groupNameById={groupNameById}
-      />
+      {canEdit && (
+        <AddRuleForm
+          languageId={languageId}
+          phonemes={phonemes}
+          groups={groups}
+          phonemeSymbolById={phonemeSymbolById}
+          groupNameById={groupNameById}
+        />
+      )}
       {rules.length === 0 ? (
         <p className="text-muted-foreground">
           No rules yet. Rules rewrite one sound into another when its neighbors
@@ -651,6 +661,7 @@ export default function RuleList({
                 groups={groups}
                 phonemeSymbolById={phonemeSymbolById}
                 groupNameById={groupNameById}
+                canEdit={canEdit}
               />
             ))}
           </ul>

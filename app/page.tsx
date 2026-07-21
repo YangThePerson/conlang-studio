@@ -37,6 +37,9 @@ const FEATURES: { label: string; description: string }[] = [
  * the CTA target — signed-in visitors skip straight to their languages instead
  * of being shown sign-up/sign-in buttons.
  */
+/** Set once the hand-authored demo language exists and is flipped `is_public`. */
+const DEMO_LANGUAGE_ID = process.env.NEXT_PUBLIC_DEMO_LANGUAGE_ID;
+
 export default async function Home() {
   const user = await getOrCreateDbUser();
 
@@ -54,9 +57,18 @@ export default async function Home() {
           </p>
 
           {user ? (
-            <Button asChild size="lg">
-              <Link href="/languages">Go to your languages</Link>
-            </Button>
+            <div className="flex gap-3">
+              <Button asChild size="lg">
+                <Link href="/languages">Go to your languages</Link>
+              </Button>
+              {DEMO_LANGUAGE_ID && (
+                <Button asChild size="lg" variant="outline">
+                  <Link href={`/languages/${DEMO_LANGUAGE_ID}`}>
+                    Try the demo
+                  </Link>
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="flex gap-3">
               <SignUpButton>
@@ -67,6 +79,13 @@ export default async function Home() {
                   Sign in
                 </Button>
               </SignInButton>
+              {DEMO_LANGUAGE_ID && (
+                <Button asChild size="lg" variant="outline">
+                  <Link href={`/languages/${DEMO_LANGUAGE_ID}`}>
+                    Try the demo
+                  </Link>
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -87,7 +106,7 @@ export default async function Home() {
           ))}
         </div>
 
-        <p className="text-muted-foreground max-w-xl">
+        <p className="text-muted-foreground max-w-xl text-center">
           Nothing is pre-built: you define every sound, syllable shape, and rule
           yourself, then generate words that follow them.
         </p>

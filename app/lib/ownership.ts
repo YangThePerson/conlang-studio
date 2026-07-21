@@ -53,6 +53,43 @@ export async function parseAndRequireOwnedLanguage(
 }
 
 /**
+ * Fetches a language row, returning `{ ok: false, kind: 'not_found' }` if it
+ * doesn't exist, or exists but is neither public nor owned by `user`. `user`
+ * is nullable so anonymous visitors can still reach a public language.
+ *
+ * Fetches by id alone and branches on `is_public`/`user_id` in JS rather than
+ * folding visibility into the WHERE clause, so "doesn't exist" and "exists
+ * but private and not yours" trivially resolve to the identical `notFound()`
+ * — a stranger probing a private language id can't distinguish the two.
+ */
+export async function requireVisibleLanguage(
+  user: DbUser | null,
+  languageId: string,
+): Promise<Result<Language>> {
+  const lang = await db.query.languages.findFirst({
+    where: eq(languages.id, languageId),
+  });
+  if (!lang) return notFound();
+  if (lang.is_public) return { ok: true, data: lang };
+  if (user && lang.user_id === user.id) return { ok: true, data: lang };
+  return notFound();
+}
+
+/**
+ * Combines {@link parseUuid} and {@link requireVisibleLanguage} — the
+ * preamble for read-only service functions that must serve both an owner
+ * and an anonymous/public visitor.
+ */
+export async function parseAndRequireVisibleLanguage(
+  user: DbUser | null,
+  rawLanguageId: unknown,
+): Promise<Result<Language>> {
+  const id = parseUuid(rawLanguageId);
+  if (!id.ok) return id;
+  return requireVisibleLanguage(user, id.data);
+}
+
+/**
  * Structural check for a Postgres unique-constraint violation (`23505`).
  * Narrower than `instanceof Error` because `pg`/postgres-js errors aren't a
  * single class hierarchy — duck-typing the `code` field is the stable check.

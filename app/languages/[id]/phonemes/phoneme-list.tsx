@@ -13,9 +13,11 @@ type Phoneme = typeof phonemes.$inferSelect;
 function PhonemeRow({
   phoneme,
   languageId,
+  canEdit,
 }: {
   phoneme: Phoneme;
   languageId: string;
+  canEdit: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -75,25 +77,29 @@ function PhonemeRow({
       <span className="flex-1 font-mono text-lg px-3">
         {'Weight: ' + phoneme.weight}
       </span>
-      <Button
-        type="button"
-        variant="edit"
-        onClick={() => setIsEditing(true)}
-        disabled={deletePending}
-        className="w-32"
-      >
-        Edit
-      </Button>
-      <form action={deleteAction}>
-        <Button
-          type="submit"
-          variant="destructive"
-          disabled={deletePending}
-          className="w-32"
-        >
-          Delete
-        </Button>
-      </form>
+      {canEdit && (
+        <>
+          <Button
+            type="button"
+            variant="edit"
+            onClick={() => setIsEditing(true)}
+            disabled={deletePending}
+            className="w-32"
+          >
+            Edit
+          </Button>
+          <form action={deleteAction}>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={deletePending}
+              className="w-32"
+            >
+              Delete
+            </Button>
+          </form>
+        </>
+      )}
     </li>
   );
 }
@@ -203,13 +209,15 @@ function PhonemeForm({
 export default function PhonemeList({
   phonemes: initialPhonemes,
   languageId,
+  canEdit,
 }: {
   phonemes: Phoneme[];
   languageId: string;
+  canEdit: boolean;
 }) {
   return (
     <div>
-      <AddPhonemeForm languageId={languageId} />
+      {canEdit && <AddPhonemeForm languageId={languageId} />}
       {initialPhonemes.length === 0 ? (
         <p className="text-muted-foreground">
           No phonemes yet. Start here. Phonemes are the raw sounds of your
@@ -221,7 +229,12 @@ export default function PhonemeList({
           {[...initialPhonemes]
             .sort(({ symbol: sa }, { symbol: sb }) => (sa < sb ? -1 : 1))
             .map((p) => (
-              <PhonemeRow key={p.id} phoneme={p} languageId={languageId} />
+              <PhonemeRow
+                key={p.id}
+                phoneme={p}
+                languageId={languageId}
+                canEdit={canEdit}
+              />
             ))}
         </ul>
       )}

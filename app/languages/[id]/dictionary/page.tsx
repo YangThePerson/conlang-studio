@@ -1,7 +1,8 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
 import { getDictionarySvc } from '@/app/lib/dictionary';
+import { parseAndRequireVisibleLanguage } from '@/app/lib/ownership';
 import { listTagsSvc } from '@/app/lib/tags';
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import DictionaryTable from './dictionary-table';
 
 /** Dictionary editor — populated in a future step. */
@@ -11,19 +12,23 @@ export default async function DictionaryPage({
   const { id } = await params;
 
   const user = await getOrCreateDbUser();
-  if (!user) redirect('/sign-in');
+
+  const langResult = await parseAndRequireVisibleLanguage(user, id);
+  if (!langResult.ok) notFound();
+  const canEdit = user !== null && langResult.data.user_id === user.id;
 
   const [dictionary, allTags] = await Promise.all([
     getDictionarySvc(user, id),
     listTagsSvc(user, id),
   ]);
-  if (!dictionary.ok || !allTags.ok) redirect('/languages');
+  if (!dictionary.ok || !allTags.ok) notFound();
 
   return (
     <DictionaryTable
       languageId={id}
       dictionary={dictionary.data}
       allTags={allTags.data}
+      canEdit={canEdit}
     />
   );
 }

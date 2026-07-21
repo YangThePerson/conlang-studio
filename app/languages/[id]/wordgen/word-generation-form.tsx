@@ -144,11 +144,13 @@ function WordPanel({
   generationPending,
   shortfall,
   languageId,
+  canEdit,
 }: {
   words: string[];
   generationPending: boolean;
   shortfall: { got: number; requested: number } | null;
   languageId: string;
+  canEdit: boolean;
 }) {
   const [addWordPending, addWordTransition] = useTransition();
   const [addedWords, setAddedWords] = useState<Set<string>>(new Set());
@@ -210,16 +212,18 @@ function WordPanel({
               key={i}
             >
               <span className="ml-12">{word}</span>
-              <Button
-                type="button"
-                size="xs"
-                onClick={() => addWord(word)}
-                title={added ? 'Added to Dictionary' : 'Add to Dictionary'}
-                disabled={added || addWordPending}
-                className="mr-2 w-10"
-              >
-                {added ? '✓' : '+'}
-              </Button>
+              {canEdit && (
+                <Button
+                  type="button"
+                  size="xs"
+                  onClick={() => addWord(word)}
+                  title={added ? 'Added to Dictionary' : 'Add to Dictionary'}
+                  disabled={added || addWordPending}
+                  className="mr-2 w-10"
+                >
+                  {added ? '✓' : '+'}
+                </Button>
+              )}
             </li>
           );
         })}
@@ -236,9 +240,11 @@ function WordPanel({
 export default function WordGenerationForm({
   languageId,
   structures,
+  canEdit,
 }: {
   languageId: string;
   structures: SyllableStructure[];
+  canEdit: boolean;
 }) {
   const [words, setWords] = useState<string[]>([]);
   const [shortfall, setShortfall] = useState<{
@@ -262,6 +268,7 @@ export default function WordGenerationForm({
         words={words}
         shortfall={shortfall}
         languageId={languageId}
+        canEdit={canEdit}
       />
     </div>
   );

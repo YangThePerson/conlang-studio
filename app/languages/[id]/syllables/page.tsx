@@ -1,14 +1,15 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { parseAndRequireVisibleLanguage } from '@/app/lib/ownership';
 import { listPhonemeGroupsWithMembersSvc } from '@/app/lib/phoneme-groups';
 import { listPhonemesSvc } from '@/app/lib/phonemes';
 import { listSyllableStructuresSvc } from '@/app/lib/syllables';
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import SyllableStructureList from './syllable-structure-list';
 
 /**
  * Syllable structures page for a language. Fetches phonemes, phoneme groups, and existing
  * syllable structures, then delegates rendering to `SyllableStructureList`.
- * Redirects to `/languages` if the language is not found or not owned by the current user.
+ * 404s if the language is not found or not visible (neither public nor owned) to the current visitor.
  */
 export default async function SyllablesPage({
   params,
@@ -16,16 +17,19 @@ export default async function SyllablesPage({
   const { id } = await params;
 
   const user = await getOrCreateDbUser();
-  if (!user) redirect('/sign-in');
+
+  const langResult = await parseAndRequireVisibleLanguage(user, id);
+  if (!langResult.ok) notFound();
+  const canEdit = user !== null && langResult.data.user_id === user.id;
 
   const phonemesResult = await listPhonemesSvc(user, id);
-  if (!phonemesResult.ok) redirect('/languages');
+  if (!phonemesResult.ok) notFound();
 
   const groupsResult = await listPhonemeGroupsWithMembersSvc(user, id);
-  if (!groupsResult.ok) redirect('/languages');
+  if (!groupsResult.ok) notFound();
 
   const syllableStructureesult = await listSyllableStructuresSvc(user, id);
-  if (!syllableStructureesult.ok) redirect('/languages');
+  if (!syllableStructureesult.ok) notFound();
 
   return (
     <section>
@@ -35,6 +39,7 @@ export default async function SyllablesPage({
         phonemes={phonemesResult.data}
         groups={groupsResult.data}
         structures={syllableStructureesult.data}
+        canEdit={canEdit}
       />
     </section>
   );

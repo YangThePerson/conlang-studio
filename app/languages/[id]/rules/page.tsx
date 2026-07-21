@@ -1,16 +1,16 @@
 import { getOrCreateDbUser } from '@/app/lib/current-user';
+import { parseAndRequireVisibleLanguage } from '@/app/lib/ownership';
 import { listPhonemeGroupsWithMembersSvc } from '@/app/lib/phoneme-groups';
 import { listPhonemesSvc } from '@/app/lib/phonemes';
 import { listRulesSvc } from '@/app/lib/rules';
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import RuleList from './rule-list';
 
 /**
  * Phonological rules page for a language. Fetches phonemes and groups (the
  * rule form's pickers need them) plus the existing rules in application order,
  * then delegates rendering to `RuleList`.
- * Redirects to `/languages` if the language is not found or not owned by the
- * current user.
+ * 404s if the language is not found or not visible (neither public nor owned) to the current visitor.
  */
 export default async function RulesPage({
   params,
@@ -18,15 +18,17 @@ export default async function RulesPage({
   const { id } = await params;
 
   const user = await getOrCreateDbUser();
-  if (!user) redirect('/sign-in');
+
+  const langResult = await parseAndRequireVisibleLanguage(user, id);
+  if (!langResult.ok) notFound();
+  const canEdit = user !== null && langResult.data.user_id === user.id;
 
   const [phonemesResult, groupsResult, rulesResult] = await Promise.all([
     listPhonemesSvc(user, id),
     listPhonemeGroupsWithMembersSvc(user, id),
     listRulesSvc(user, id),
   ]);
-  if (!phonemesResult.ok || !groupsResult.ok || !rulesResult.ok)
-    redirect('/languages');
+  if (!phonemesResult.ok || !groupsResult.ok || !rulesResult.ok) notFound();
 
   return (
     <section>
@@ -36,6 +38,7 @@ export default async function RulesPage({
         phonemes={phonemesResult.data}
         groups={groupsResult.data}
         rules={rulesResult.data}
+        canEdit={canEdit}
       />
     </section>
   );
