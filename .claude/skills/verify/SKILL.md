@@ -25,6 +25,8 @@ npm run dev
 
 Serves at http://localhost:3000. Requires `.env` with `DATABASE_URL` (Neon dev DB) and Clerk keys. Run it in the background and watch the console — server-side throws and unhandled promise rejections show up there, not in the browser.
 
+If the flow you're verifying is already covered by a committed spec in `e2e/` (`golden-path`, `anon-demo`, `sign-in` — see `playwright.config.ts`), prefer `npm run test:e2e` over improvising a scratch/screenshot script: it drives the same flow through a maintained auth fixture and asserts on outcomes instead of producing a screenshot to eyeball. Fall back to the options below for anything not yet covered by a spec.
+
 ### The auth wall
 
 Everything meaningful sits behind Clerk. What you can verify **without** a session:
