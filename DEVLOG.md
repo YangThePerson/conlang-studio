@@ -307,3 +307,9 @@ Also, settled on the specific semantic versioning rules to follow:
 - PATCH: Copy/UI/bug fixes, no schema change, no new Svc functions
 - MINOR: New features/capabilities added additively. New columns/tables, new Svc functions or routes, widened existing behavior (like today's DbUser | null) that doesn't change how existing callers work
 - MAJOR: Anything that breaks existing data or existing usage. Non-additive migrations (renames/drops, backfills that lose info), or a fundamental rework of a core model
+
+### Day 43
+
+**Shipped** Added `Playwright/test` to the project and set up a simple e2e test setup to be used along the verify SKILL. The specific tools that I have access to mean that this could not be implemented into CI, so it needs to happen before pushing anything new.
+
+**Learned** The latest refactor with the demo language showed me that leaving e2e testing to CC's discretion is grossly inefficient. Having to derive basic tests every time is time consuming and token consuming and is every kind of inefficient. The setup I am working with is the main limiting factor. There is no test database. There are no secrets in the CI (and adding them would probably be a big change to how security is handled here). There is exactly one test account. There are no instances of `data-testid` throughout the app because this was not a prior consideration (though that could and likely will change in a future pass).
