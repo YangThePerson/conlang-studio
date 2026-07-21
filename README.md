@@ -38,8 +38,8 @@ matching set of authenticated HTTP API routes under `/api/languages/[id]/...`
 
 ### Screenshots
 
-|                              Rules editor                              |                              Dictionary                              |
-| :----------------------------------------------------------------------: | :----------------------------------------------------------------------: |
+|                                             Rules editor                                             |                                      Dictionary                                       |
+| :--------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------: |
 | ![Sound-change rule editor with context slots and a live preview](docs/screenshots/rules-editor.png) | ![Dictionary entry expanded to show senses and tags](docs/screenshots/dictionary.png) |
 
 ## Tech stack
@@ -81,6 +81,8 @@ Requires a [Neon](https://neon.tech/) Postgres database and a
    # auth-gated flows without real email verification.
    CLERK_TEST_USER_EMAIL=
    CLERK_TEST_USER_PASSWORD=
+
+   NEXT_PUBLIC_DEMO_LANGUAGE_ID=
    ```
 
 3. Apply migrations to your database (see [Database](#database)):
@@ -99,14 +101,14 @@ Requires a [Neon](https://neon.tech/) Postgres database and a
 
 ## Commands
 
-| Command             | Purpose                                                     |
-| -------------------- | ------------------------------------------------------------ |
-| `npm run dev`         | Dev server at http://localhost:3000                          |
-| `npm run build`       | Production build; also the strictest whole-project type check |
-| `npm run test:run`    | Vitest, single pass (`npm test` runs in watch mode)          |
-| `npm run lint`        | ESLint                                                        |
-| `npm run db:generate`  | Generate a migration from schema changes in `app/db/schema.ts` |
-| `npm run db:migrate`   | Apply pending migrations to the database                      |
+| Command               | Purpose                                                        |
+| --------------------- | -------------------------------------------------------------- |
+| `npm run dev`         | Dev server at http://localhost:3000                            |
+| `npm run build`       | Production build; also the strictest whole-project type check  |
+| `npm run test:run`    | Vitest, single pass (`npm test` runs in watch mode)            |
+| `npm run lint`        | ESLint                                                         |
+| `npm run db:generate` | Generate a migration from schema changes in `app/db/schema.ts` |
+| `npm run db:migrate`  | Apply pending migrations to the database                       |
 
 ## Architecture
 
