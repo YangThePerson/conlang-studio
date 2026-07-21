@@ -16,6 +16,15 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Playwright fixtures (e2e/fixtures.ts) take a `use` callback param per
+    // Playwright's own API — react-hooks/rules-of-hooks misreads that as the
+    // React 19 `use()` hook. This directory has no React in it.
+    files: ["e2e/**"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
