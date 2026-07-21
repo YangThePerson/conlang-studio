@@ -295,3 +295,15 @@ There's a lot that I learned here. It was my first big excursion into a project 
 **Shipped:** Let it sit for a second. Then, the day after publishing that retrospective, pushed four commits: empty-state hints pointing users from phonemes toward groups/structures/rules, a landing page update, a languages list update, and an input alignment fix on the wordgen form.
 
 **Learned:** "Let it sit" apparently has a misserably short shelf life. In fairness to past me, these were all cosmetic. Nno schema changes, no new Svc functions, nothing that reopens the endless-polish trap I actually warned myself about. The trap was scope creep on features and architecture, not "noticed a paragraph of empty-state copy was unhelpful and fixed it in ten minutes." I expect more of these while the next large-ish update gets planned out. **TODO: Figure out how version numbers actually work because I am not entirely sure what counts as v1.0.1 vs v1.1.0**
+
+### Day 42
+
+**Shipped:** A public, read-only demo language. A recruiter or a random visitor hits the Clerk wall before seeing a single page of the app, and that's a bad first impression. Added `is_public` to `languages` (proper migration this time, not a push), a new `requireVisibleLanguage`/`parseAndRequireVisibleLanguage` pair in `app/lib/ownership.ts` next to the existing helpers, widened the six read Svc functions (plus `generateWordSvc`) to take `user: DbUser | null`, and reworked all six language subpages to resolve visibility instead of bouncing straight to sign-in. Every mutation control across all seven client components now takes a `canEdit` prop and just doesn't render for a non-owner. Widened `proxy.ts`'s public matcher so anonymous requests can actually reach those pages. In all, it touched twenty-ish files. Verified it with Playwright driving both a signed-in owner session and a signed-out incognito context against a language I flipped `is_public` on directly through Neon.
+
+**Learned:** This one's less about a new tool and more about a design choice. My first instinct was a `readOnly` flag on the resolved user. Simple, works for exactly one hardcoded demo account. The problem is it doesn't generalize. I eventually want to add real collaboration, and a flag on the user can't express that. It can only express "this whole user session is read-only," which is far too narrow. `is_public` on the language row is barely more work today and is the right shape for the future when sharing shows up, `is_public` just becomes the "anyone" case next to a future grants table, instead of being ripped out.
+
+Also, settled on the specific semantic versioning rules to follow:
+
+- PATCH: Copy/UI/bug fixes, no schema change, no new Svc functions
+- MINOR: New features/capabilities added additively. New columns/tables, new Svc functions or routes, widened existing behavior (like today's DbUser | null) that doesn't change how existing callers work
+- MAJOR: Anything that breaks existing data or existing usage. Non-additive migrations (renames/drops, backfills that lose info), or a fundamental rework of a core model
