@@ -54,7 +54,7 @@ const mockUser: typeof users.$inferSelect = {
 };
 
 const mockLanguage = {
-  id: LANG_ID, user_id: mockUser.id, name: 'Testlang',
+  id: LANG_ID, user_id: mockUser.id, name: 'Testlang', is_public: false,
   created_at: new Date(), updated_at: new Date(),
 };
 
