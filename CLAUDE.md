@@ -6,8 +6,10 @@
 
 - `npm run dev` — dev server at http://localhost:3000
 - `npm run test:run` — vitest, single pass (`npm test` is watch mode; don't use it from an agent)
+- `npm run test:e2e` — Playwright, against a running dev server. Not run in CI (single shared Clerk test account and dev DB, no per-worker isolation) — run it manually via the `verify` skill.
 - `npm run lint` — ESLint
-- `npm run build` — production build; also the strictest whole-project type check
+- `npm run build` — production build
+- `npm run typecheck` — `next typegen && tsc --noEmit`, the strictest whole-project type check. `build`'s TypeScript pass only checks files reachable from routes/pages despite `tsconfig.json` including the whole project — `typecheck` is what CI runs and what actually catches errors in files like tests.
 - `npm run db:generate` — after editing `app/db/schema.ts`, generate a migration file into `drizzle/`.
 - `npm run db:migrate` — apply pending migrations in `drizzle/` to the Neon database. This is the only schema-sync workflow; `db:push` has been retired now that migrations are committed.
 - Requires `DATABASE_URL` (Neon) and Clerk keys in `.env`.
@@ -56,7 +58,7 @@ Helper modules (read their JSDoc before writing a new service function):
 
 - `app/lib/result.ts` — the `Result` type and constructors: `notFound()`, `invalidId()`, `conflict()`, `validationIssues(zodError)`, `validationMessage(issues)` for non-Zod checks (uniqueness conflicts, cross-field rules).
 - `app/lib/parse.ts` — `parseUuid(raw)` for bare ID params; `parseInput(schema, raw)` for body/form input. Both return `Result`-compatible failures for direct early return.
-- `app/lib/ownership.ts` — `parseAndRequireOwnedLanguage(user, rawId)` (the common preamble), `requireOwnedLanguage`, `ownedLanguageIds(user)` (subquery for tables that carry `language_id` but no `user_id`), `isUniqueViolation(err)` (Postgres 23505 duck-type).
+- `app/lib/ownership.ts` — `parseAndRequireOwnedLanguage(user, rawId)` (the common preamble), `requireOwnedLanguage`, `ownedLanguageIds(user)` (subquery for tables that carry `language_id` but no `user_id`), `isUniqueViolation(err)` (Postgres 23505 duck-type). For read-only paths that must also serve an anonymous visitor: `parseAndRequireVisibleLanguage(user, rawId)` / `requireVisibleLanguage` take `user: DbUser | null` and additionally allow a language with `is_public = true` through — see the public demo language note in Security requirements.
 
 ### `app/<feature>/actions.ts` — Server Action adapters
 
@@ -116,6 +118,15 @@ Every operation satisfies all three before touching the database:
 
 A missing ownership check silently allows cross-user data access (IDOR).
 
+**Deliberate exception — the public demo language:** a language with
+`is_public = true` can be read anonymously. Read-only service functions for
+such paths take `user: DbUser | null` and call
+`parseAndRequireVisibleLanguage`/`requireVisibleLanguage` instead of the
+owned-only variants; `user` stays required (non-null) for every mutation.
+This is the only carve-out from strict per-user ownership, and it's
+read-only by construction — do not widen a mutation service to accept a
+null user.
+
 ---
 
 ## Frontend: server-first, service layer is the only data source
@@ -126,11 +137,12 @@ Components are adapters too, not a second home for logic.
 - **Server-only imports stay on the server.** Client Components must not import `app/lib/*`, `app/db/index.ts`, `app/db/schema.ts`, or call `auth()`/`getOrCreateDbUser()`. Exception by design: `app/db/validation.ts` and `app/db/json-shapes.ts` are shared — client forms import input schemas from there. Client files get data via props from a Server Component or via a Server Action's return value.
 - **Reads: a Server Component is the third adapter.** Resolve the user with `getOrCreateDbUser()`, call a service read function (`listLanguagesSvc(user)`) — never query the DB inline. The `Result` contract applies: `{ ok: false }` renders the empty/error state.
 - **Mutations: client form → `useActionState` → Server Action → service.** Render from the returned `Result`; use `issues` (the `z.treeifyError` shape) to place field-level errors next to the right inputs. Never throw from an action for expected failures.
+- **Visibility-gated pages: a `canEdit` prop, not a second data source.** On pages a `parseAndRequireVisibleLanguage` read can serve to an anonymous visitor (currently the public demo language), the Server Component computes `canEdit = user !== null && lang.user_id === user.id` and passes it down; client components hide their mutation controls entirely for `canEdit === false` rather than disabling them or re-deriving ownership client-side.
 - **Client-side validation is UX, not enforcement.** Reuse the same `create<Entity>InputSchema` / `update<Entity>InputSchema` in the form for fast feedback; the service re-validates regardless. One schema, two consumers — never a second hand-rolled set of checks.
 - **Loading and error UI**: `loading.tsx` (or `<Suspense>`) for every route that fetches; `error.tsx` (a Client Component) is the boundary where genuinely-unexpected throws land — expected failures never reach it; `not-found.tsx` for the not-found path.
 - **Styling: Tailwind, tokens over literals.** Design tokens (`--background`, `--card`, `--primary`, `--muted-foreground`, `--destructive`, `--border`, `--edit`, …) live in `app/globals.css` and drive semantic Tailwind classes (`bg-card`, `text-muted-foreground`, `bg-primary`) — never hardcode a literal Tailwind palette color (`bg-gray-800`, `text-teal-500`) for anything brand or interactive. Exception: status text (validation errors, phonotactics warnings) uses plain semantic red/amber, deliberately kept outside the accent system so it reads as state, not brand.
-- **Shared primitives live in `app/components/ui/`** (Button, Input, Label, Badge, Card — via shadcn/ui; `cn()` helper in `app/components/utils.ts`). Reach for these instead of hand-rolling a `<button>`/`<input>`. The `edit` Button variant is a project-specific addition (not a shadcn default) backing the violet/plum "Edit" action color, themed via the `--edit`/`--edit-foreground` tokens.
-- **Theming**: `app/components/theme-provider.tsx` wraps the tree with `next-themes` (`attribute="class"`, `defaultTheme="dark"`, `enableSystem={false}`); `app/components/theme-toggle.tsx` is the header sun/moon button. `<html>` no longer hardcodes `className="dark"` — it carries `suppressHydrationWarning` instead, since next-themes sets the class client-side before hydration. Any new literal color (the header/sidebar chrome mistake this caught: `bg-[#0a0d08] text-white`) breaks light mode silently — tokens aren't optional here, they're what makes the toggle work.
+- **Shared primitives live in `app/components/ui/`** (Button, Input, Label, Badge, Card, `FormError` — via shadcn/ui for the first five; `cn()` helper in `app/components/utils.ts`). Reach for these instead of hand-rolling a `<button>`/`<input>`. The `edit` Button variant is a project-specific addition (not a shadcn default) backing the violet/plum "Edit" action color, themed via the `--edit`/`--edit-foreground` tokens. `app/components/action-state.ts` (`ActionState` type, `fieldError`/`anyFieldError`/`failureMessage`) is the client-safe, structurally-typed mirror of `Result` that pairs with `FormError` — it lives outside `app/lib/` specifically so Client Components can import it.
+- **Theming**: `app/components/theme/theme-provider.tsx` wraps the tree with `next-themes` (`attribute="class"`, `defaultTheme="dark"`, `enableSystem={false}`); `app/components/theme/theme-toggle.tsx` is the header sun/moon button. `<html>` no longer hardcodes `className="dark"` — it carries `suppressHydrationWarning` instead, since next-themes sets the class client-side before hydration. Any new literal color (the header/sidebar chrome mistake this caught: `bg-[#0a0d08] text-white`) breaks light mode silently — tokens aren't optional here, they're what makes the toggle work.
 - Learn each utility class you use; don't paste an opaque class string you can't read back.
 - **Accessibility baseline**: every input has a `<label>`; every button is a real `<button>`; keyboard operable with visible focus; semantic elements over `<div>` soup; meaningful `alt` text.
 
@@ -139,6 +151,8 @@ Components are adapters too, not a second home for logic.
 ## Testing
 
 Vitest. Unit tests live in `app/lib/__tests__/` and target **pure, framework-free domain logic** (`phonotactics.ts`, `wordgen.ts`). Adapters and DB-touching service functions are not unit-tested — keep new domain logic pure (no DB, no framework imports) so it stays testable this way. Run with `npm run test:run`.
+
+End-to-end coverage of adapters/DB-touching flows lives separately in `e2e/` (Playwright): an authenticated golden-path spec (create a language through generating a word), an anonymous-visitor spec against the public demo language, and a sign-in spec, plus shared fixtures and a Clerk auth setup. Run with `npm run test:e2e` against a running dev server. Deliberately **not** in CI — there's one shared Clerk test account and one shared dev database (`workers: 1`, no per-worker isolation), so it's run manually as part of the `verify` skill before pushing.
 
 ---
 
@@ -154,9 +168,8 @@ Vitest. Unit tests live in `app/lib/__tests__/` and target **pure, framework-fre
 
 Intentionally out of scope now — listed so they aren't forgotten, not so they are done now:
 
-- **Rate limiting** on sensitive operations once the app is public-facing.
+- **Rate limiting** on sensitive operations, especially now that anonymous visitors can hit the public demo language without an account.
 - **DB transactions** for any mutation touching more than one table.
 - **Token-based auth resolver** for route handlers, when a mobile client becomes real.
 - **`conflict` → `409`** in route handlers (currently `400`); now a one-line change in `STATUS_BY_KIND` in `app/lib/http.ts`.
 - **Optimistic UI** (`useOptimistic`) where the round-trip feels slow.
-- **Shared UI primitives** (button, input, card) once duplication starts to hurt; design tokens/theming only if surfaces multiply.
