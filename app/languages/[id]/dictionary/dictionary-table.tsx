@@ -16,6 +16,7 @@ import { failureMessage, fieldError } from '@/app/components/action-state';
 import TagManager from './tag-manager';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 
@@ -86,7 +87,7 @@ function AddLexemeForm({ languageId }: { languageId: string }) {
       <Button type="submit" disabled={pending} className="w-32">
         {pending ? 'Adding…' : 'Add Word'}
       </Button>
-      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
+      <FormError message={error} className="w-full" />
     </form>
   );
 }
@@ -161,7 +162,7 @@ function AddSenseForm({
       >
         {pending ? 'Adding…' : 'Add Sense'}
       </Button>
-      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
+      <FormError message={error} className="w-full" />
     </form>
   );
 }
@@ -240,7 +241,7 @@ function SenseEditRow({
           Delete
         </Button>
       </form>
-      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
+      <FormError message={error} className="w-full" />
     </li>
   );
 }
@@ -277,7 +278,7 @@ function TagChip({
           ×
         </button>
       </Badge>
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      <FormError message={error} className="text-xs" />
     </form>
   );
 }
@@ -350,7 +351,7 @@ function AttachTagForm({
       >
         {pending ? 'Adding…' : 'Attach'}
       </Button>
-      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
+      <FormError message={error} className="w-full" />
     </form>
   );
 }
@@ -424,9 +425,7 @@ function LexemeEditCard({
         >
           {savePending ? 'Saving…' : 'Save'}
         </Button>
-        {lexemeError && (
-          <p className="text-red-400 text-sm w-full">{lexemeError}</p>
-        )}
+        <FormError message={lexemeError} className="w-full" />
       </form>
 
       {/* Senses */}
@@ -602,11 +601,7 @@ function LexemeEntry({
               >
                 Delete
               </Button>
-              {deleteError && (
-                <p className="text-red-400 text-sm w-full text-left">
-                  {deleteError}
-                </p>
-              )}
+              <FormError message={deleteError} className="w-full text-left" />
             </form>
           )}
         </td>

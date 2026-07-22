@@ -4,7 +4,9 @@ import { useActionState, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { createLanguage, updateLanguage, deleteLanguage } from './actions';
 import type { languages } from '@/app/db/schema';
+import { failureMessage, fieldError } from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Input } from '@/app/components/ui/input';
 
 type Language = typeof languages.$inferSelect;
@@ -16,8 +18,11 @@ type Language = typeof languages.$inferSelect;
 function LanguageItem({ lang }: { lang: Language }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
-  const [, startTransition] = useTransition();
-  const [, deleteAction, deletePending] = useActionState(
+  const [renameState, setRenameState] = useState<
+    Awaited<ReturnType<typeof updateLanguage>> | null
+  >(null);
+  const [renamePending, startTransition] = useTransition();
+  const [deleteState, deleteAction, deletePending] = useActionState(
     deleteLanguage.bind(null, lang.id),
     null,
   );
@@ -25,58 +30,69 @@ function LanguageItem({ lang }: { lang: Language }) {
   function startEdit() {
     setIsEditing(true);
     setEditName(lang.name);
+    setRenameState(null);
   }
 
   function commitRename() {
     startTransition(async () => {
-      await updateLanguage(lang.id, editName);
-      setIsEditing(false);
+      const result = await updateLanguage(lang.id, editName);
+      setRenameState(result);
+      // Stay in edit mode on failure so the error is visible and the
+      // attempted name isn't lost.
+      if (result.ok) setIsEditing(false);
     });
   }
 
+  const renameError =
+    failureMessage(renameState) ?? fieldError(renameState, 'name');
+
   return (
-    <li className="flex items-center gap-2 rounded-lg border bg-card p-3">
-      {isEditing ? (
-        <Input
-          autoFocus
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitRename();
-            if (e.key === 'Escape') setIsEditing(false);
-          }}
-          onBlur={commitRename}
-          className="flex-1 h-8"
-        />
-      ) : (
-        <Link
-          href={`/languages/${lang.id}`}
-          className="flex-1 text-left hover:underline"
-        >
-          {lang.name}
-        </Link>
-      )}
-      <form action={deleteAction}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={isEditing}
-          onClick={startEdit}
-          className="text-muted-foreground"
-        >
-          Rename
-        </Button>
-        <Button
-          type="submit"
-          variant="ghost"
-          size="sm"
-          disabled={deletePending}
-          className="text-red-400 hover:text-red-300"
-        >
-          Delete
-        </Button>
-      </form>
+    <li className="flex flex-col gap-1 rounded-lg border bg-card p-3">
+      <div className="flex items-center gap-2">
+        {isEditing ? (
+          <Input
+            autoFocus
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitRename();
+              if (e.key === 'Escape') setIsEditing(false);
+            }}
+            onBlur={commitRename}
+            disabled={renamePending}
+            className="flex-1 h-8"
+          />
+        ) : (
+          <Link
+            href={`/languages/${lang.id}`}
+            className="flex-1 text-left hover:underline"
+          >
+            {lang.name}
+          </Link>
+        )}
+        <form action={deleteAction}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isEditing}
+            onClick={startEdit}
+            className="text-muted-foreground"
+          >
+            Rename
+          </Button>
+          <Button
+            type="submit"
+            variant="ghost"
+            size="sm"
+            disabled={deletePending}
+            className="text-red-400 hover:text-red-300"
+          >
+            Delete
+          </Button>
+        </form>
+      </div>
+      <FormError message={renameError ?? failureMessage(deleteState)} />
     </li>
   );
 }
@@ -110,13 +126,11 @@ export default function LanguageList({
             Create
           </Button>
         </div>
-        {createState && !createState.ok && (
-          <p className="text-red-500 text-sm">
-            {createState.kind === 'validation'
-              ? 'Invalid input — please check the form.'
-              : 'Something went wrong. Please try again.'}
-          </p>
-        )}
+        <FormError
+          message={
+            failureMessage(createState) ?? fieldError(createState, 'name')
+          }
+        />
       </form>
 
       {langs.length === 0 ? (

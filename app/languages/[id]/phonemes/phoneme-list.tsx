@@ -3,7 +3,9 @@
 import { useActionState, useId, useState } from 'react';
 import { createPhoneme, updatePhoneme, deletePhoneme } from './actions';
 import type { phonemes } from '@/app/db/schema';
+import { anyFieldError, failureMessage } from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 
@@ -21,7 +23,7 @@ function PhonemeRow({
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
-  const [, deleteAction, deletePending] = useActionState(
+  const [deleteState, deleteAction, deletePending] = useActionState(
     deletePhoneme.bind(null, languageId, phoneme.id),
     null,
   );
@@ -55,51 +57,50 @@ function PhonemeRow({
           cancel={() => setIsEditing(false)}
           phoneme={phoneme}
         />
-        {editState && !editState.ok && (
-          <p className="text-red-400 text-sm">
-            {editState.kind === 'validation'
-              ? 'Invalid input — check symbol and weight.'
-              : 'Something went wrong. Please try again.'}
-          </p>
-        )}
+        <FormError
+          message={failureMessage(editState) ?? anyFieldError(editState)}
+        />
       </li>
     );
   }
 
   return (
-    <li className="flex items-center gap-2 rounded-lg border bg-card p-3">
-      <span className="flex-1 font-mono text-lg px-3">
-        {'Symbol: ' + phoneme.symbol}
-      </span>
-      <span className="flex-1 font-mono text-lg px-3">
-        {'IPA: ' + (phoneme.ipa ? phoneme.ipa : 'N/A')}
-      </span>
-      <span className="flex-1 font-mono text-lg px-3">
-        {'Weight: ' + phoneme.weight}
-      </span>
-      {canEdit && (
-        <>
-          <Button
-            type="button"
-            variant="edit"
-            onClick={() => setIsEditing(true)}
-            disabled={deletePending}
-            className="w-32"
-          >
-            Edit
-          </Button>
-          <form action={deleteAction}>
+    <li className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex items-center gap-2">
+        <span className="flex-1 font-mono text-lg px-3">
+          {'Symbol: ' + phoneme.symbol}
+        </span>
+        <span className="flex-1 font-mono text-lg px-3">
+          {'IPA: ' + (phoneme.ipa ? phoneme.ipa : 'N/A')}
+        </span>
+        <span className="flex-1 font-mono text-lg px-3">
+          {'Weight: ' + phoneme.weight}
+        </span>
+        {canEdit && (
+          <>
             <Button
-              type="submit"
-              variant="destructive"
+              type="button"
+              variant="edit"
+              onClick={() => setIsEditing(true)}
               disabled={deletePending}
               className="w-32"
             >
-              Delete
+              Edit
             </Button>
-          </form>
-        </>
-      )}
+            <form action={deleteAction}>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={deletePending}
+                className="w-32"
+              >
+                Delete
+              </Button>
+            </form>
+          </>
+        )}
+      </div>
+      <FormError message={failureMessage(deleteState)} />
     </li>
   );
 }
@@ -114,15 +115,7 @@ function AddPhonemeForm({ languageId }: { languageId: string }) {
   return (
     <div className="mb-6">
       <PhonemeForm mode="Add" formAction={formAction} pending={pending} />
-      {state && !state.ok && (
-        <p className="text-red-400 text-sm">
-          {state.kind === 'validation'
-            ? 'Invalid input — check symbol and weight.'
-            : state.kind === 'not_found'
-              ? 'Language not found.'
-              : 'Something went wrong. Please try again.'}
-        </p>
-      )}
+      <FormError message={failureMessage(state) ?? anyFieldError(state)} />
     </div>
   );
 }

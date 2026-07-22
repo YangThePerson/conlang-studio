@@ -9,8 +9,13 @@ import type { PhonemeGroupWithMembers } from '@/app/lib/phoneme-groups';
 import { formatRule, formatSlot } from '@/app/lib/rule-notation';
 import { useActionState, useMemo, useState } from 'react';
 import { createRule, deleteRule, moveRule, updateRule } from './actions';
-import { failureMessage, type ActionState } from '../dictionary/action-state';
+import {
+  anyFieldError,
+  failureMessage,
+  type ActionState,
+} from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Label } from '@/app/components/ui/label';
 
 type Phoneme = typeof phonemesTable.$inferSelect;
@@ -21,25 +26,16 @@ type TargetKind = 'phoneme' | 'group';
 /**
  * One user-facing message for a failed action `Result`. Non-validation kinds
  * go through the shared `failureMessage`; validation failures are summarized
- * from whichever `issues` shape the service produced (a bare message string
- * from `validationMessage`, or `z.treeifyError` output).
+ * via `anyFieldError` since a rule has no single field the failure should
+ * anchor to (target, output, and both contexts can each be the culprit).
  */
 function formErrorMessage(state: ActionState): string | undefined {
   if (!state || state.ok) return undefined;
-  if (state.kind !== 'validation') return failureMessage(state);
-  const issues = state.issues;
-  if (typeof issues === 'string') return issues;
-  if (typeof issues === 'object' && issues !== null) {
-    const { errors, properties } = issues as {
-      errors?: string[];
-      properties?: Record<string, { errors?: string[] } | undefined>;
-    };
-    if (errors?.length) return errors[0];
-    for (const field of Object.values(properties ?? {})) {
-      if (field?.errors?.length) return field.errors[0];
-    }
-  }
-  return 'Some fields are invalid.';
+  return (
+    failureMessage(state) ??
+    anyFieldError(state) ??
+    (state.kind === 'validation' ? 'Some fields are invalid.' : undefined)
+  );
 }
 
 /** Add Rule button. Toggles between a single button and the reusable Add/Edit form. */
@@ -140,11 +136,11 @@ function RuleRow({
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
-  const [, moveUpAction, moveUpPending] = useActionState(
+  const [moveUpState, moveUpAction, moveUpPending] = useActionState(
     moveRule.bind(null, languageId, rule.id, 'up'),
     null,
   );
-  const [, moveDownAction, moveDownPending] = useActionState(
+  const [moveDownState, moveDownAction, moveDownPending] = useActionState(
     moveRule.bind(null, languageId, rule.id, 'down'),
     null,
   );
@@ -152,6 +148,11 @@ function RuleRow({
     deleteRule.bind(null, languageId, rule.id),
     null,
   );
+
+  const rowError =
+    formErrorMessage(deleteState) ??
+    formErrorMessage(moveUpState) ??
+    formErrorMessage(moveDownState);
   // Wrapped (rather than plain-bound) so the row can leave edit mode on
   // success from the event, avoiding a setState-in-effect.
   const [editState, editAction, editPending] = useActionState(
@@ -220,11 +221,7 @@ function RuleRow({
         <p className="font-mono text-lg">
           {formatRule(rule, phonemeSymbolById, groupNameById)}
         </p>
-        {deleteState && !deleteState.ok && (
-          <p className="text-sm text-red-400">
-            {formErrorMessage(deleteState)}
-          </p>
-        )}
+        <FormError message={rowError} />
       </div>
       {canEdit && (
         <div className="flex gap-2">
@@ -578,7 +575,7 @@ function RuleForm({
         Preview: {preview}
       </p>
 
-      {errorMessage && <p className="text-sm text-red-400">{errorMessage}</p>}
+      <FormError message={errorMessage} />
 
       {/* Commit or cancel */}
       <div className="flex flex-row gap-2 self-end">

@@ -10,7 +10,9 @@ import {
 } from './actions';
 import { templateSchema } from '@/app/db/json-shapes';
 import { z } from 'zod';
+import { anyFieldError, failureMessage } from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Label } from '@/app/components/ui/label';
 
 type Phoneme = typeof phonemes.$inferSelect;
@@ -44,7 +46,7 @@ function AddSyllableStructureForm({
 
   // Wrapped (rather than plain-bound) so the form can close itself on
   // success from the event, avoiding a setState-in-effect.
-  const [, formAction, pending] = useActionState(
+  const [state, formAction, pending] = useActionState(
     async (
       prev: Awaited<ReturnType<typeof createSyllableStructure>> | null,
       formData: FormData,
@@ -59,16 +61,21 @@ function AddSyllableStructureForm({
   return (
     <div className="mb-6">
       {isAdding ? (
-        <SyllableStructureForm
-          formAction={formAction}
-          cancel={() => setIsAdding(false)}
-          pending={pending}
-          mode="Add"
-          template={[]}
-          initialWeight={1}
-          phonemes={phonemes}
-          groups={groups}
-        />
+        <>
+          <SyllableStructureForm
+            formAction={formAction}
+            cancel={() => setIsAdding(false)}
+            pending={pending}
+            mode="Add"
+            template={[]}
+            initialWeight={1}
+            phonemes={phonemes}
+            groups={groups}
+          />
+          <FormError
+            message={failureMessage(state) ?? anyFieldError(state)}
+          />
+        </>
       ) : (
         <Button
           type="button"
@@ -99,14 +106,14 @@ function SyllableStructureRow({
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
-  const [, deleteAction, deletePending] = useActionState(
+  const [deleteState, deleteAction, deletePending] = useActionState(
     deleteSyllableStructure.bind(null, languageId, structure.id),
     null,
   );
 
   // Wrapped (rather than plain-bound) so the row can leave edit mode on
   // success from the event, avoiding a setState-in-effect.
-  const [, editAction, editPending] = useActionState(
+  const [editState, editAction, editPending] = useActionState(
     async (
       prev: Awaited<ReturnType<typeof updateSyllableStructure>> | null,
       formData: FormData,
@@ -125,53 +132,63 @@ function SyllableStructureRow({
 
   if (isEditing)
     return (
-      <SyllableStructureForm
-        formAction={editAction}
-        cancel={() => setIsEditing(false)}
-        pending={editPending}
-        mode="Edit"
-        template={structure.template}
-        initialWeight={structure.weight}
-        phonemes={phonemes}
-        groups={groups}
-      />
+      <li className="rounded-lg border bg-card p-2">
+        <SyllableStructureForm
+          formAction={editAction}
+          cancel={() => setIsEditing(false)}
+          pending={editPending}
+          mode="Edit"
+          template={structure.template}
+          initialWeight={structure.weight}
+          phonemes={phonemes}
+          groups={groups}
+        />
+        <FormError
+          message={failureMessage(editState) ?? anyFieldError(editState)}
+        />
+      </li>
     );
 
   return (
-    <li className="flex items-center gap-2 rounded-lg border bg-card p-3 justify-between">
-      <div className="flex flex-row mx-3 w-full">
-        <p className="flex-2 font-mono">
-          Template:
-          {structure.template.map((slot, i) => {
-            const label = slotLabel(slot, phonemes, groups);
-            return <span key={i}> {slot.optional ? `(${label})` : label}</span>;
-          })}
-        </p>
-        <p className="flex-1 font-mono">Weight: {structure.weight}</p>
-      </div>
-      {canEdit && (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="edit"
-            onClick={() => setIsEditing(true)}
-            disabled={deletePending}
-            className="w-32"
-          >
-            Edit
-          </Button>
-          <form action={deleteAction}>
+    <li className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-row mx-3 w-full">
+          <p className="flex-2 font-mono">
+            Template:
+            {structure.template.map((slot, i) => {
+              const label = slotLabel(slot, phonemes, groups);
+              return (
+                <span key={i}> {slot.optional ? `(${label})` : label}</span>
+              );
+            })}
+          </p>
+          <p className="flex-1 font-mono">Weight: {structure.weight}</p>
+        </div>
+        {canEdit && (
+          <div className="flex gap-2">
             <Button
-              type="submit"
-              variant="destructive"
+              type="button"
+              variant="edit"
+              onClick={() => setIsEditing(true)}
               disabled={deletePending}
               className="w-32"
             >
-              Delete
+              Edit
             </Button>
-          </form>
-        </div>
-      )}
+            <form action={deleteAction}>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={deletePending}
+                className="w-32"
+              >
+                Delete
+              </Button>
+            </form>
+          </div>
+        )}
+      </div>
+      <FormError message={failureMessage(deleteState)} />
     </li>
   );
 }

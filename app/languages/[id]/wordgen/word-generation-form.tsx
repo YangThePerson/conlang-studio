@@ -4,7 +4,9 @@ import { useEffect, useState, useTransition } from 'react';
 import { syllable_structures } from '@/app/db/schema';
 import { redirect } from 'next/navigation';
 import { addWordToDictionary, generateWords } from './actions';
+import { anyFieldError, failureMessage } from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 
@@ -44,15 +46,7 @@ function WordGenControls({
       );
 
       if (!result.ok) {
-        setError(
-          result.kind === 'validation'
-            ? 'Invalid generation settings — check syllable counts and structures.'
-            : result.kind === 'not_found'
-              ? 'Language or syllable structures not found.'
-              : result.kind === 'unauthorized'
-                ? 'You must be signed in to generate words.'
-                : 'Something went wrong. Please try again.',
-        );
+        setError(failureMessage(result) ?? anyFieldError(result) ?? null);
         return;
       }
 
@@ -129,7 +123,7 @@ function WordGenControls({
       >
         {pending ? 'Generating...' : 'Generate'}
       </Button>
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      <FormError message={error} />
     </form>
   );
 }
@@ -161,15 +155,7 @@ function WordPanel({
       const result = await addWordToDictionary(languageId, word);
 
       if (!result.ok) {
-        setAddError(
-          result.kind === 'validation'
-            ? 'Invalid word.'
-            : result.kind === 'not_found'
-              ? 'Language not found.'
-              : result.kind === 'unauthorized'
-                ? 'You must be signed in to add words.'
-                : 'Something went wrong. Please try again.',
-        );
+        setAddError(failureMessage(result) ?? anyFieldError(result) ?? null);
         return;
       }
 
@@ -202,7 +188,7 @@ function WordPanel({
           phonological space is too constrained for more unique words.
         </p>
       )}
-      {addError && <p className="text-red-400 text-sm">{addError}</p>}
+      <FormError message={addError} />
       <ul className="flex flex-1 flex-col font-mono justify-around w-full">
         {words.map((word, i) => {
           const added = addedWords.has(word);

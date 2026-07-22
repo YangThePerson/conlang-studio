@@ -4,7 +4,9 @@ import { phonemes } from '@/app/db/schema';
 import { PhonemeGroupWithMembers } from '@/app/lib/phoneme-groups';
 import { useActionState, useState } from 'react';
 import { createGroup, deleteGroup, updateGroup } from './actions';
+import { anyFieldError, failureMessage } from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 
@@ -33,13 +35,9 @@ function AddGroupForm({ languageId }: { languageId: string }) {
           Add
         </Button>
       </div>
-      {createState && !createState.ok && (
-        <p className="text-red-400 text-sm">
-          {createState.kind === 'validation'
-            ? 'Invalid input — please check the form.'
-            : 'Something went wrong. Please try again.'}
-        </p>
-      )}
+      <FormError
+        message={failureMessage(createState) ?? anyFieldError(createState)}
+      />
     </form>
   );
 }
@@ -127,7 +125,7 @@ function GroupRow({
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
-  const [, deleteAction, deletePending] = useActionState(
+  const [deleteState, deleteAction, deletePending] = useActionState(
     deleteGroup.bind(null, languageId, group.id),
     null,
   );
@@ -156,54 +154,53 @@ function GroupRow({
           phonemes={phonemes}
           group={group}
         />
-        {editState && !editState.ok && (
-          <p className="text-red-400 text-sm">
-            {editState.kind === 'validation'
-              ? 'Invalid input — check name.'
-              : 'Something went wrong. Please try again.'}
-          </p>
-        )}
+        <FormError
+          message={failureMessage(editState) ?? anyFieldError(editState)}
+        />
       </li>
     );
   }
 
   return (
-    <li className="flex flex-row items-center gap-2 rounded-lg border bg-card p-3">
-      <div className="flex-1 flex flex-row">
-        <p className="w-1/4">
-          <strong>Name: </strong>
-          {group.name}
-        </p>
-        <p className="w-3/4">
-          <strong>Members: </strong>
-          {group.members.length
-            ? group.members.map(formatPhonemePresentation).join(', ')
-            : 'None'}
-        </p>
-      </div>
-      {canEdit && (
-        <>
-          <Button
-            type="button"
-            variant="edit"
-            disabled={deletePending}
-            onClick={() => setIsEditing(true)}
-            className="w-32"
-          >
-            Edit
-          </Button>
-          <form action={deleteAction}>
+    <li className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex flex-row items-center gap-2">
+        <div className="flex-1 flex flex-row">
+          <p className="w-1/4">
+            <strong>Name: </strong>
+            {group.name}
+          </p>
+          <p className="w-3/4">
+            <strong>Members: </strong>
+            {group.members.length
+              ? group.members.map(formatPhonemePresentation).join(', ')
+              : 'None'}
+          </p>
+        </div>
+        {canEdit && (
+          <>
             <Button
-              type="submit"
-              variant="destructive"
+              type="button"
+              variant="edit"
               disabled={deletePending}
+              onClick={() => setIsEditing(true)}
               className="w-32"
             >
-              Delete
+              Edit
             </Button>
-          </form>
-        </>
-      )}
+            <form action={deleteAction}>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={deletePending}
+                className="w-32"
+              >
+                Delete
+              </Button>
+            </form>
+          </>
+        )}
+      </div>
+      <FormError message={failureMessage(deleteState)} />
     </li>
   );
 }

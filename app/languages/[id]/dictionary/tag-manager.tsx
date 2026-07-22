@@ -5,6 +5,7 @@ import { useActionState, useState } from 'react';
 import { createTag, deleteTag, renameTag } from './actions';
 import { failureMessage, fieldError } from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
+import { FormError } from '@/app/components/ui/form-error';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 
@@ -46,7 +47,7 @@ function AddTagForm({ languageId }: { languageId: string }) {
       <Button type="submit" disabled={pending} className="w-24">
         {pending ? 'Adding…' : 'Add Tag'}
       </Button>
-      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
+      <FormError message={error} className="w-full" />
     </form>
   );
 }
@@ -109,7 +110,7 @@ function TagRow({
           Delete
         </Button>
       </form>
-      {error && <p className="text-red-400 text-sm w-full">{error}</p>}
+      <FormError message={error} className="w-full" />
     </li>
   );
 }
