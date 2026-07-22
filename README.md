@@ -31,6 +31,11 @@ day-by-day build process is written up in [DEVLOG.md](DEVLOG.md).
 - **Phonotactics checker** — validates a word against every syllable template
   in a language (expanding optional slots), for hand-typed entries that
   aren't guaranteed to fit the rules.
+- **Public demo language** — a single language can be flagged `is_public` so
+  anonymous visitors can open it read-only (browse phonemes/rules, run the
+  word generator) straight from the "Try the demo" link on the landing page,
+  no sign-in required. Mutation controls simply don't render for a
+  non-owner; every other language stays private to its owner.
 
 Every feature above is exposed both through the app's UI and through a
 matching set of authenticated HTTP API routes under `/api/languages/[id]/...`
@@ -52,7 +57,8 @@ matching set of authenticated HTTP API routes under `/api/languages/[id]/...`
 - [Zod](https://zod.dev/) for input validation
 - [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
   (Radix primitives, `cva` variants) for styling
-- [Vitest](https://vitest.dev/) for unit tests
+- [Vitest](https://vitest.dev/) for unit tests, [Playwright](https://playwright.dev/)
+  for end-to-end tests
 
 ## Getting started
 
@@ -82,6 +88,8 @@ Requires a [Neon](https://neon.tech/) Postgres database and a
    CLERK_TEST_USER_EMAIL=
    CLERK_TEST_USER_PASSWORD=
 
+   # Optional: id of a language with `is_public = true`, powering the
+   # "Try the demo" link on the landing page for signed-out visitors.
    NEXT_PUBLIC_DEMO_LANGUAGE_ID=
    ```
 
@@ -104,8 +112,10 @@ Requires a [Neon](https://neon.tech/) Postgres database and a
 | Command               | Purpose                                                        |
 | --------------------- | -------------------------------------------------------------- |
 | `npm run dev`         | Dev server at http://localhost:3000                            |
-| `npm run build`       | Production build; also the strictest whole-project type check  |
+| `npm run build`       | Production build                                               |
+| `npm run typecheck`   | Whole-project type check (`tsc --noEmit`); stricter than `build`, which only checks files reachable from routes |
 | `npm run test:run`    | Vitest, single pass (`npm test` runs in watch mode)            |
+| `npm run test:e2e`    | Playwright end-to-end tests against a running dev server (not run in CI — single shared test account/DB) |
 | `npm run lint`        | ESLint                                                         |
 | `npm run db:generate` | Generate a migration from schema changes in `app/db/schema.ts` |
 | `npm run db:migrate`  | Apply pending migrations to the database                       |
