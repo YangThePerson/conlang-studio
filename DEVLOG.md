@@ -313,3 +313,9 @@ Also, settled on the specific semantic versioning rules to follow:
 **Shipped** Added `Playwright/test` to the project and set up a simple e2e test setup to be used along the verify SKILL. The specific tools that I have access to mean that this could not be implemented into CI, so it needs to happen before pushing anything new.
 
 **Learned** The latest refactor with the demo language showed me that leaving e2e testing to CC's discretion is grossly inefficient. Having to derive basic tests every time is time consuming and token consuming and is every kind of inefficient. The setup I am working with is the main limiting factor. There is no test database. There are no secrets in the CI (and adding them would probably be a big change to how security is handled here). There is exactly one test account. There are no instances of `data-testid` throughout the app because this was not a prior consideration (though that could and likely will change in a future pass).
+
+### Day 44
+
+**Shipped** Added new error component and moved the action state type to the shared UI directory. Used CC to make a pass through the codebase to identify previous instances of inline error handling and replaced them with the new component. Found some gaps where Result was not being used and errors were silently discarded and filled them in.
+
+**Learned** Uniformity across the codebase is something that'll pay off very soon. The next big pass I want to make is updating the site with propper a11y and, the more parts I am able to reuse, the less work I need to do to fix it. Once again, this would have been nice to thing about from the start, but that's just another lesson to bank for the next project.
