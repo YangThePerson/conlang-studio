@@ -12,7 +12,7 @@ import {
   updateLexeme,
   updateSense,
 } from './actions';
-import { failureMessage, fieldError } from './action-state';
+import { failureMessage, fieldError } from '@/app/components/action-state';
 import TagManager from './tag-manager';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';

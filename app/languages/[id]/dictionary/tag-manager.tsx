@@ -3,7 +3,7 @@
 import { tags } from '@/app/db/schema';
 import { useActionState, useState } from 'react';
 import { createTag, deleteTag, renameTag } from './actions';
-import { failureMessage, fieldError } from './action-state';
+import { failureMessage, fieldError } from '@/app/components/action-state';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
